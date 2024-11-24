@@ -61,6 +61,10 @@
             <artifactId>camel-quarkus-langchain4j-chat</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.apache.camel.quarkus</groupId>
+            <artifactId>camel-quarkus-langchain4j-tools</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkiverse.langchain4j</groupId>
             <artifactId>quarkus-langchain4j-openai</artifactId>
             <version>0.21.0</version>

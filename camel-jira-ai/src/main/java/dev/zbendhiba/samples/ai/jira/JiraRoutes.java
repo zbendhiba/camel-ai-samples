@@ -33,13 +33,19 @@ public class JiraRoutes extends RouteBuilder {
                 .setBody(constant(SUMMARY_PROMPT))
                 // add details of the JIRA issue
                 .enrich("direct:get-issue-details", aggregatorStrategy)
-                .to("langchain4j-chat:summary");
+               .to("langchain4j-chat:jirSummary")
+                .to("jira:addComment");
+
+
+        // Add the JIRA summary to the JIRA
 
         // Update the JIRA issue with the provided summary
-        from("langchain4j-tool:addComment?tags=jira&description=Add a comment in a JIRA issue&parameter.issue=string&parameter.comment=string")
+      /* from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.issue=string&parameter.comment=string")
                 .setHeader(ISSUE_KEY, simple(":#issue"))
                 .setBody(simple(":#comment"))
-                .to("jira:addComment");
+                .to("jira:addComment");*/
+
+
 
 
     }
