@@ -11,12 +11,14 @@ import static org.apache.camel.component.jira.JiraConstants.ISSUE_KEY;
 @ApplicationScoped
 public class JiraRoutes extends RouteBuilder {
 
-    private static final String SUMMARY_PROMPT = "You are a helpful assistant that summarizes JIRA issues for handovers and adds the summaries as comments.\n" +
-            "\n" +
-            "When provided with a JIRA issue's details, including the title, description, and comments (with their updated dates), you should:\n" +
-            "1. Read the information carefully.\n" +
-            "2. Generate a concise summary of the issue, focusing on the key points and any action items.\n" +
-            "3. Ensure the summary is short, clear, and useful for handovers. No more than 50 words.";
+    private static final String SUMMARY_PROMPT = """
+            You are a helpful assistant that summarizes JIRA issues for handovers and adds the summaries as comments.
+                        
+            When provided with a JIRA issue's details, including the title, description, and comments (with their updated dates), you should:
+            1. Read the information carefully.
+            2. Generate a concise summary of the issue, focusing on the key points and any action items.
+            3. Ensure the summary is short, clear, and useful for handovers. No more than 50 words.
+            """;
 
     @Override
     public void configure() throws Exception {
@@ -33,20 +35,17 @@ public class JiraRoutes extends RouteBuilder {
                 .setBody(constant(SUMMARY_PROMPT))
                 // add details of the JIRA issue
                 .enrich("direct:get-issue-details", aggregatorStrategy)
-               .to("langchain4j-chat:jirSummary")
+                .to("langchain4j-chat:jiraSummary")
                 .to("jira:addComment");
 
 
         // Add the JIRA summary to the JIRA
 
         // Update the JIRA issue with the provided summary
-      /* from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.issue=string&parameter.comment=string")
+       from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.issue=string&parameter.comment=string")
                 .setHeader(ISSUE_KEY, simple(":#issue"))
                 .setBody(simple(":#comment"))
-                .to("jira:addComment");*/
-
-
-
+                .to("jira:addComment");
 
     }
 }
