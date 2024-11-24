@@ -4,6 +4,22 @@ This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
 If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
 
+# Setting up a JIRA account
+
+In this sample, I am using a free JIRA Cloud account.
+Create a JIRA project and an API token.
+Create an issue (complex to resolve) in the board and add multiple comments.
+
+Set the environment variables:
+
+```shell script
+export JIRA_PROJECT_KEY=YOUR_PROJECT_KEY
+export JIRA_URL=YOUR_JIRA_CLOUD_URL
+export JIRA_USERNAME-YOUR_LOGIN_EMAIL
+export JIRA_ACCESS_TOKEN=YOUR_API_TOKEN
+```
+
+
 ## Running the application in dev mode
 
 You can run your application in dev mode that enables live coding using:
@@ -13,6 +29,12 @@ You can run your application in dev mode that enables live coding using:
 ```
 
 > **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+
+Verify your credentials and retrieve information about your JIRA issue:
+
+```shell script
+curl http://localhost:8080/jira/issue/YOUR_ISSUE_NUMBER
+```
 
 ## Packaging and running the application
 
@@ -59,3 +81,4 @@ If you want to learn more about building native executables, please consult <htt
 - Camel Jira ([guide](https://camel.apache.org/camel-quarkus/latest/reference/extensions/jira.html)): Interact with JIRA issue tracker
 - Camel langChain4j Chat ([guide](https://camel.apache.org/camel-quarkus/latest/reference/extensions/langchain4j-chat.html)): LangChain4j Chat component
 - LangChain4j OpenAI ([guide](https://docs.quarkiverse.io/quarkus-langchain4j/dev/index.html)): Provides the basic integration with LangChain4j
+
