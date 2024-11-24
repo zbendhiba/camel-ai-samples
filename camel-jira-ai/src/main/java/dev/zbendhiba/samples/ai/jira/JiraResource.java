@@ -19,7 +19,7 @@ public class JiraResource {
     @Inject
     ProducerTemplate producerTemplate;
 
-    @Path("/issue/{key}")
+   /* @Path("/issue/{key}")
     @GET
     @Produces(MediaType.APPLICATION_JSON)
     public Response readIssueByKey(@PathParam("key") String key) {
@@ -28,6 +28,30 @@ public class JiraResource {
             return Response.ok(issueToJson(issue)).build();
         } catch (Exception e) {
             return Response.status(404).build();
+        }
+    }*/
+
+    @Path("/issue/{key}")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String readIssueByKey(@PathParam("key") String key) {
+        try {
+            String issue = producerTemplate.requestBodyAndHeader("direct:get-issue-details", null, ISSUE_KEY, key, String.class);
+            return issue;
+        } catch (Exception e) {
+            return "N/A";
+        }
+    }
+
+    @Path("/summary/{key}")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public String summary(@PathParam("key") String key) {
+        try {
+            String issue = producerTemplate.requestBodyAndHeader("direct:get-jira-summary", null, ISSUE_KEY, key, String.class);
+            return issue;
+        } catch (Exception e) {
+            return "N/A";
         }
     }
 
