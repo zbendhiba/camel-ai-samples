@@ -45,7 +45,7 @@ public class JiraRoutes extends RouteBuilder {
         // Add the JIRA summary to the JIRA
         from("direct:test-tools")
                 .bean(MyTransformer.class, "tools")
-         .to("langchain4j-tools:jiraSummary?tags=jira");
+                .to("langchain4j-tools:jiraSummary?tags=jira");
 
         // Update the JIRA issue with the provided summary
        from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.IssueKey=string&parameter.comment=string")
@@ -53,9 +53,8 @@ public class JiraRoutes extends RouteBuilder {
                    String issueKey = e.getIn().getHeader(ISSUE_KEY, String.class);
                    issueKey = issueKey.replace("\"", "").replace("'", "");
                    e.getIn().setHeader(ISSUE_KEY, issueKey);
+                   e.getIn().setBody(e.getIn().getHeader("comment"));
                })
-               .setHeader(ISSUE_KEY, simple(":#issue"))
-                .setBody(simple(":#comment"))
                 .to("jira:addComment");
 
         from("langchain4j-tools:jiraDetails?tags=jira&description=GET the description of a JIRA issue&parameter.IssueKey=string")
@@ -65,6 +64,8 @@ public class JiraRoutes extends RouteBuilder {
                     e.getIn().setHeader(ISSUE_KEY, issueKey);
                 })
               .to("direct:get-issue-details");
+
+
 
     }
 }

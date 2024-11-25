@@ -23,10 +23,14 @@ import jakarta.json.JsonObjectBuilder;
 @Named("myTransformer")
 public class MyTransformer {
 
-    private static final String JIRA_PROMPT = """
-    You are a bot responsible for getting summary of a JIRA, and add comment if the user asks for the second one. 
-    Use the tools provided to perform the request
-    """;
+    private static final String SUMMARY_PROMPT = """
+            You are a helpful assistant that summarizes JIRA issues for handovers and adds the summaries as comments.
+                        
+            When provided with a JIRA issue's details, including the title, description, and comments (with their updated dates), you should:
+            1. Read the information carefully.
+            2. Generate a concise summary of the issue, focusing on the key points and any action items.
+            3. Ensure the summary is short, clear, and useful for handovers. No more than 50 words.
+            """;
 
     public  List<String> issueToRAGContent(Issue issue){
         StringBuilder issueContent = new StringBuilder();
@@ -44,7 +48,7 @@ public class MyTransformer {
 
     public List<ChatMessage> tools(String userPrompt){
         List<ChatMessage> messages = new ArrayList<>();
-        messages.add(new SystemMessage(JIRA_PROMPT));
+        messages.add(new SystemMessage(SUMMARY_PROMPT));
         messages.add(new UserMessage(userPrompt));
         return messages;
     }
