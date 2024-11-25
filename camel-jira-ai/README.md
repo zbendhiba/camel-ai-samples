@@ -36,6 +36,15 @@ Verify your credentials and retrieve information about your JIRA issue:
 curl http://localhost:8080/jira/issue/YOUR_ISSUE_NUMBER
 ```
 
+using a tool
+```shell script
+{
+   "issueKey": "INC-1",
+    "question": "Can you give me a summary of this JIRA issue number INC-1?"
+}
+
+```
+
 ## Packaging and running the application
 
 The application can be packaged using:

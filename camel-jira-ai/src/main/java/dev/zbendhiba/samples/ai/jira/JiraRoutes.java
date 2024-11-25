@@ -43,27 +43,36 @@ public class JiraRoutes extends RouteBuilder {
         // Add the JIRA summary to the JIRA
 
         from("direct:test-tools")
-                .log("heyyyyyy***")
                 .bean(MyTransformer.class, "tools")
 
          .to("langchain4j-tools:jiraSummary?tags=jira");
 
         // Update the JIRA issue with the provided summary
        from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.issue=string&parameter.comment=string")
+               .process(e -> {
+                   Object body = e.getIn().getBody();
+                   System.out.println("hello");
+               })
                .setHeader(ISSUE_KEY, simple(":#issue"))
                 .setBody(simple(":#comment"))
                 .to("jira:addComment");
 
-        from("langchain4j-tools:jiraComments?tags=jira&description=GET the description of a JIRA&parameter.issue=string")
+        from("langchain4j-tools:jiraDetails?tags=jira&description=GET the description of a JIRA issue&parameter.issueKey=string")
                 .log("hello from tools get information of a comment")
 
-                .setBody(constant(SUMMARY_PROMPT))
+
+              //  .setBody(constant(SUMMARY_PROMPT))
                 // add details of the JIRA issue
-                .enrich("direct:get-issue-details", aggregatorStrategy)
-                //.setHeader(ISSUE_KEY, simple(":#issue"))
-                .log("step 1")
-                .log("header information is ${header.IssueKey}")
-                .to("direct:get-issue-details")
+              //  .setHeader(ISSUE_KEY, simple(":#issue"))
+                .process(e -> {
+                    Object body = e.getIn().getBody();
+                    System.out.println("hello");
+                })
+                .setBody(constant("response"))
+               // .enrich("direct:get-issue-details", aggregatorStrategy)
+               // .log("step 1")
+              //  .log("header information is ${header.IssueKey}")
+            //    .to("direct:get-issue-details")
                 .log("step 2")
         ;
 

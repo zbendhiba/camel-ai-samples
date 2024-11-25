@@ -42,16 +42,16 @@ public class MyTransformer {
         return augmentedData;
     }
 
-    /*public List<ChatMessage> tools(String userPrompt){
+    public List<ChatMessage> tools(String userPrompt){
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(new SystemMessage(JIRA_PROMPT));
         messages.add(new UserMessage(userPrompt));
         return messages;
-    }*/
-
-    public String tools(String userPrompt){
-       return JIRA_PROMPT + " " + userPrompt;
     }
+
+ /*   public String tools(String userPrompt){
+       return JIRA_PROMPT + " " + userPrompt;
+    }*/
 
 
 }
