@@ -5,6 +5,9 @@ import java.util.List;
 
 import com.atlassian.jira.rest.client.api.domain.Comment;
 import com.atlassian.jira.rest.client.api.domain.Issue;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.rag.content.Content;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,6 +22,12 @@ import jakarta.json.JsonObjectBuilder;
 @RegisterForReflection
 @Named("myTransformer")
 public class MyTransformer {
+
+    private static final String JIRA_PROMPT = """
+    You are a bot responsible for getting summary of a JIRA, and add comment if the user asks for the second one. 
+    Use the tools provided to perform the request
+    """;
+
     public  List<String> issueToRAGContent(Issue issue){
         StringBuilder issueContent = new StringBuilder();
         issueContent.append("Title: ").append(issue.getDescription()).append(", ");
@@ -31,6 +40,17 @@ public class MyTransformer {
         List<String> augmentedData = List.of(
                 issueContent.toString());
         return augmentedData;
+    }
+
+    /*public List<ChatMessage> tools(String userPrompt){
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(new SystemMessage(JIRA_PROMPT));
+        messages.add(new UserMessage(userPrompt));
+        return messages;
+    }*/
+
+    public String tools(String userPrompt){
+       return JIRA_PROMPT + " " + userPrompt;
     }
 
 

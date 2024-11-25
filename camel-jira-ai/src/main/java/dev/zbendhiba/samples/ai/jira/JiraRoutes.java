@@ -20,6 +20,7 @@ public class JiraRoutes extends RouteBuilder {
             3. Ensure the summary is short, clear, and useful for handovers. No more than 50 words.
             """;
 
+
     @Override
     public void configure() throws Exception {
         // Create an instance of the RAG aggregator strategy
@@ -31,21 +32,40 @@ public class JiraRoutes extends RouteBuilder {
                 .bean(MyTransformer.class, "issueToRAGContent");
 
         // Get an AI summary of the JIRA issue
-        from("direct:get-jira-summary")
+        /*from("direct:get-jira-summary")
                 .setBody(constant(SUMMARY_PROMPT))
                 // add details of the JIRA issue
                 .enrich("direct:get-issue-details", aggregatorStrategy)
-                .to("langchain4j-chat:jiraSummary")
-                .to("jira:addComment");
+                .to("langchain4j-chat:jiraSummary?tags")
+                .to("jira:addComment");*/
 
 
         // Add the JIRA summary to the JIRA
 
+        from("direct:test-tools")
+                .log("heyyyyyy***")
+                .bean(MyTransformer.class, "tools")
+
+         .to("langchain4j-tools:jiraSummary?tags=jira");
+
         // Update the JIRA issue with the provided summary
        from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.issue=string&parameter.comment=string")
-                .setHeader(ISSUE_KEY, simple(":#issue"))
+               .setHeader(ISSUE_KEY, simple(":#issue"))
                 .setBody(simple(":#comment"))
                 .to("jira:addComment");
+
+        from("langchain4j-tools:jiraComments?tags=jira&description=GET the description of a JIRA&parameter.issue=string")
+                .log("hello from tools get information of a comment")
+
+                .setBody(constant(SUMMARY_PROMPT))
+                // add details of the JIRA issue
+                .enrich("direct:get-issue-details", aggregatorStrategy)
+                //.setHeader(ISSUE_KEY, simple(":#issue"))
+                .log("step 1")
+                .log("header information is ${header.IssueKey}")
+                .to("direct:get-issue-details")
+                .log("step 2")
+        ;
 
     }
 }

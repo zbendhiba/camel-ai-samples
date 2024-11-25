@@ -5,7 +5,9 @@ import jakarta.inject.Inject;
 import jakarta.json.Json;
 import jakarta.json.JsonObject;
 import jakarta.json.JsonObjectBuilder;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -49,6 +51,20 @@ public class JiraResource {
     public String summary(@PathParam("key") String key) {
         try {
             String issue = producerTemplate.requestBodyAndHeader("direct:get-jira-summary", null, ISSUE_KEY, key, String.class);
+            return issue;
+        } catch (Exception e) {
+            return "N/A";
+        }
+    }
+
+    @Path("/test/")
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.TEXT_PLAIN)
+    public String tools( Question question) {
+        try {
+           System.out.println("hello world");
+            String issue = producerTemplate.requestBodyAndHeader("direct:test-tools", question.question, ISSUE_KEY, question.issueKey, String.class);
             return issue;
         } catch (Exception e) {
             return "N/A";
