@@ -12,7 +12,6 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import org.apache.camel.ProducerTemplate;
 import static org.apache.camel.component.jira.JiraConstants.ISSUE_KEY;
 
@@ -21,64 +20,38 @@ public class JiraResource {
     @Inject
     ProducerTemplate producerTemplate;
 
-   /* @Path("/issue/{key}")
-    @GET
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response readIssueByKey(@PathParam("key") String key) {
-        try {
-            Issue issue = producerTemplate.requestBodyAndHeader("jira:fetchIssue", null, ISSUE_KEY, key, Issue.class);
-            return Response.ok(issueToJson(issue)).build();
-        } catch (Exception e) {
-            return Response.status(404).build();
-        }
-    }*/
-
     @Path("/issue/{key}")
     @GET
-    @Produces(MediaType.APPLICATION_JSON)
     public String readIssueByKey(@PathParam("key") String key) {
         try {
-            String issue = producerTemplate.requestBodyAndHeader("direct:get-issue-details", null, ISSUE_KEY, key, String.class);
-            return issue;
+            return producerTemplate.requestBodyAndHeader("direct:get-issue-details", null, ISSUE_KEY, key, String.class);
         } catch (Exception e) {
-            return "N/A";
+            return "Error";
         }
     }
 
     @Path("/summary/{key}")
     @GET
-    @Produces(MediaType.APPLICATION_JSON)
     public String summary(@PathParam("key") String key) {
         try {
-            String issue = producerTemplate.requestBodyAndHeader("direct:get-jira-summary", null, ISSUE_KEY, key, String.class);
-            return issue;
+            return producerTemplate.requestBodyAndHeader("direct:get-jira-summary", null, ISSUE_KEY, key, String.class);
         } catch (Exception e) {
-            return "N/A";
+            return "Error";
         }
     }
 
     @Path("/test/")
     @POST
-    @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.TEXT_PLAIN)
-    public String tools( Question question) {
+    public String tools( String question) {
         try {
            System.out.println("hello world");
-            String issue = producerTemplate.requestBodyAndHeader("direct:test-tools", question.question, ISSUE_KEY, question.issueKey, String.class);
-            return issue;
+            return  producerTemplate.requestBody("direct:test-tools", question, String.class);
         } catch (Exception e) {
-            return "N/A";
+            return "Error";
         }
     }
 
-    private JsonObject issueToJson(Issue issue) {
-        JsonObjectBuilder builder = Json.createObjectBuilder();
-        builder.add("description", issue.getDescription());
-        builder.add("key", issue.getKey());
-        builder.add("summary", issue.getSummary());
-        builder.add("type", issue.getIssueType().getName());
-        return builder.build();
-    }
 
 }
 
