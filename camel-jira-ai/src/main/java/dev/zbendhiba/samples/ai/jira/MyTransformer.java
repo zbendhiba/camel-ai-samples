@@ -53,6 +53,10 @@ public class MyTransformer {
         return messages;
     }
 
+    public String cleanIssueKey(String header){
+        return header.replace("\"", "").replace("'", "");
+    }
+
 
 
 }

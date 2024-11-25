@@ -28,7 +28,6 @@ public class JiraRoutes extends RouteBuilder {
 
         // Get details of a JIRA issue
         from("direct:get-issue-details")
-                //.setHeader(ISSUE_KEY, method(MyTransformer.class, "removeQuotes"))
                 .to("jira:fetchIssue")
                 .log("after fetch")
                 .bean(MyTransformer.class, "issueToRAGContent");
@@ -49,21 +48,15 @@ public class JiraRoutes extends RouteBuilder {
 
         // Update the JIRA issue with the provided summary
        from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.IssueKey=string&parameter.comment=string")
-               .process(e -> {
-                   String issueKey = e.getIn().getHeader(ISSUE_KEY, String.class);
-                   issueKey = issueKey.replace("\"", "").replace("'", "");
-                   e.getIn().setHeader(ISSUE_KEY, issueKey);
-                   e.getIn().setBody(e.getIn().getHeader("comment"));
-               })
-                .to("jira:addComment");
+               // Bug with OpenAI
+               .setHeader(ISSUE_KEY, method(MyTransformer.class, "cleanIssueKey(${header.IssueKey})"))
+               .setBody(header("comment"))
+               .to("jira:addComment");
 
         from("langchain4j-tools:jiraDetails?tags=jira&description=GET the description of a JIRA issue&parameter.IssueKey=string")
-                .process(e -> {
-                    String issueKey = e.getIn().getHeader(ISSUE_KEY, String.class);
-                    issueKey = issueKey.replace("\"", "").replace("'", "");
-                    e.getIn().setHeader(ISSUE_KEY, issueKey);
-                })
-              .to("direct:get-issue-details");
+                // Bug with OpenAI
+                .setHeader(ISSUE_KEY, method(MyTransformer.class, "cleanIssueKey(${header.IssueKey})"))
+                .to("direct:get-issue-details");
 
 
 
