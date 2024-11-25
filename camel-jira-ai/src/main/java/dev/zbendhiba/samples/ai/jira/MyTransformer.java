@@ -49,9 +49,6 @@ public class MyTransformer {
         return messages;
     }
 
- /*   public String tools(String userPrompt){
-       return JIRA_PROMPT + " " + userPrompt;
-    }*/
 
 
 }

@@ -28,53 +28,43 @@ public class JiraRoutes extends RouteBuilder {
 
         // Get details of a JIRA issue
         from("direct:get-issue-details")
+                //.setHeader(ISSUE_KEY, method(MyTransformer.class, "removeQuotes"))
                 .to("jira:fetchIssue")
+                .log("after fetch")
                 .bean(MyTransformer.class, "issueToRAGContent");
 
         // Get an AI summary of the JIRA issue
-        /*from("direct:get-jira-summary")
+        from("direct:get-jira-summary")
                 .setBody(constant(SUMMARY_PROMPT))
                 // add details of the JIRA issue
                 .enrich("direct:get-issue-details", aggregatorStrategy)
-                .to("langchain4j-chat:jiraSummary?tags")
-                .to("jira:addComment");*/
+                .to("langchain4j-chat:jiraSummary")
+                .to("jira:addComment");
 
 
         // Add the JIRA summary to the JIRA
-
         from("direct:test-tools")
                 .bean(MyTransformer.class, "tools")
-
          .to("langchain4j-tools:jiraSummary?tags=jira");
 
         // Update the JIRA issue with the provided summary
-       from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.issue=string&parameter.comment=string")
+       from("langchain4j-tools:jiraComments?tags=jira&description=Add a comment in a JIRA issue&parameter.IssueKey=string&parameter.comment=string")
                .process(e -> {
-                   Object body = e.getIn().getBody();
-                   System.out.println("hello");
+                   String issueKey = e.getIn().getHeader(ISSUE_KEY, String.class);
+                   issueKey = issueKey.replace("\"", "").replace("'", "");
+                   e.getIn().setHeader(ISSUE_KEY, issueKey);
                })
                .setHeader(ISSUE_KEY, simple(":#issue"))
                 .setBody(simple(":#comment"))
                 .to("jira:addComment");
 
-        from("langchain4j-tools:jiraDetails?tags=jira&description=GET the description of a JIRA issue&parameter.issueKey=string")
-                .log("hello from tools get information of a comment")
-
-
-              //  .setBody(constant(SUMMARY_PROMPT))
-                // add details of the JIRA issue
-              //  .setHeader(ISSUE_KEY, simple(":#issue"))
+        from("langchain4j-tools:jiraDetails?tags=jira&description=GET the description of a JIRA issue&parameter.IssueKey=string")
                 .process(e -> {
-                    Object body = e.getIn().getBody();
-                    System.out.println("hello");
+                    String issueKey = e.getIn().getHeader(ISSUE_KEY, String.class);
+                    issueKey = issueKey.replace("\"", "").replace("'", "");
+                    e.getIn().setHeader(ISSUE_KEY, issueKey);
                 })
-                .setBody(constant("response"))
-               // .enrich("direct:get-issue-details", aggregatorStrategy)
-               // .log("step 1")
-              //  .log("header information is ${header.IssueKey}")
-            //    .to("direct:get-issue-details")
-                .log("step 2")
-        ;
+              .to("direct:get-issue-details");
 
     }
 }
