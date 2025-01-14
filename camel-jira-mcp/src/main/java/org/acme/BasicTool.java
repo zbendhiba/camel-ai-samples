@@ -3,7 +3,7 @@ package org.acme;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 
-//class from Burr
+//class copied from Burr Sutter https://github.com/burrsutter/quarkus-mcp-server-basic-tool/blob/main/src/main/java/org/acme/BasicTool.java
 public class BasicTool {
 
    // hello world style tool
