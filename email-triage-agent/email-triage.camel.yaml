@@ -1,0 +1,16 @@
+- route:
+    id: read-emails
+    from:
+      uri: imaps://imap.gmail.com
+      parameters:
+        username: "{{mail.username}}"
+        password: "{{mail.password}}"
+        delete: "false"
+        unseen: "true"
+      steps:
+        - log:
+            message: "Subject: ${header.Subject}"
+        - log:
+            message: "From: ${header.From}"
+        - log:
+            message: "Body: ${body}"

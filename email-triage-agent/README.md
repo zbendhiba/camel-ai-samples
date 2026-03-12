@@ -25,6 +25,26 @@ The agent reads unread emails, classifies them by urgency, summarizes content, a
 - Kaoto for visual route design
 - No database required — connects to an existing IMAP mailbox
 
+## Gmail Setup
+
+1. Log in to your Google account at https://myaccount.google.com/security
+2. Make sure **2-Step Verification** is enabled. If not, enable it first.
+3. Once 2FA is active, go to https://myaccount.google.com/apppasswords
+4. Create a new App Password named `camel-email-agent`
+5. Copy the generated 16-character password into `application.properties`:
+
+```properties
+mail.username=your-email@gmail.com
+mail.password=xxxx xxxx xxxx xxxx
+```
+
+## Running
+
+```bash
+cd email-triage-agent
+camel run email-triage.camel.yaml
+```
+
 ## Status
 
-Not yet implemented.
+Work in progress — prototyping with Kaoto and Camel YAML DSL.

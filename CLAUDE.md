@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**All code, comments, documentation, and commit messages in this project must be written in English.**
+
 ## Overview
 
 A monorepo of sample projects demonstrating Apache Camel + AI integrations, built on Quarkus (Java 21, Maven). Each subdirectory is a standalone Quarkus application with its own `pom.xml` and Maven wrapper.
