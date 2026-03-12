@@ -54,6 +54,14 @@ Requires JIRA Cloud credentials:
 JIRA_PROJECT_KEY, JIRA_URL, JIRA_USERNAME, JIRA_ACCESS_TOKEN
 ```
 
+## Camel MCP Server
+
+A Camel MCP server is configured (`.mcp.json`) and provides access to the full Apache Camel catalog documentation. Use it when creating or editing Camel routes to:
+- Browse components, dataformats, EIPs, kamelets, and languages
+- Look up component options and EIP documentation
+- Validate and transform Camel routes
+- Get route context and hardening suggestions
+
 ## Key Architecture Notes
 
 - There is no parent POM — each project is fully independent with its own Quarkus BOM imports.
