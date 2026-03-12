@@ -1,11 +1,10 @@
 - route:
     id: read-emails
     from:
-      uri: imaps://imap.gmail.com
+      uri: imaps
       parameters:
-        username: "{{mail.username}}"
-        password: "{{mail.password}}"
         delete: "false"
+        host: //imap.gmail.com
         unseen: "true"
       steps:
         - log:
