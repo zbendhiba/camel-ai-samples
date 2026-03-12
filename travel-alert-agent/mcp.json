@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "camel": {
+      "command": "env",
+      "args": [
+        "PATH=/Users/zbendhib/.jbang/bin:/usr/bin:/bin",
+        "-S",
+        "jbang",
+        "-Dquarkus.log.level=WARN",
+        "org.apache.camel:camel-jbang-mcp:4.18.0:runner"
+      ]
+    }
+  }
+}
