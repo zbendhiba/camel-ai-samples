@@ -1,0 +1,136 @@
+- route:
+    id: triage-email-main-agent
+    from:
+      uri: google-mail-stream:0
+      parameters:
+        applicationName: camel-email-triage
+        delay: "10000"
+        markAsRead: "false"
+        query: is:unread in:inbox
+      steps:
+        - setVariable:
+            description: Clean email body - strip HTML tags and decode entities
+            name: cleanedEmailBody
+            simple:
+              expression: ${body} ~> ${htmlDecode()}
+              trimResult: true
+        - setVariable:
+            description: Clean email subject - decode HTML entities
+            name: cleanedSubject
+            simple:
+              expression: ${header.CamelGoogleMailStreamSubject} ~> ${htmlDecode()}
+              trimResult: true
+        - setBody:
+            id: prompt
+            description: Triage prompt
+            simple: |-
+              Classify this email. Respond with ONLY the JSON object. Do NOT wrap it in ```json``` or any markdown. Do NOT add any text before or after the JSON.
+
+              Categories: URGENT (deadlines, incidents, escalations), ACTION_REQUIRED (someone asks you to do something or reply — even if not urgent), INFORMATIONAL (FYI only, newsletters, automated notifications, no action needed from you), SUSPICIOUS (spam, phishing, gift/prize scams, urgency pressure), PURCHASE (orders, invoices, receipts), SHIPPING (tracking, delivery updates). If in doubt between ACTION_REQUIRED and INFORMATIONAL, choose ACTION_REQUIRED.
+
+              Set needsReply=true ONLY if a real person is directly asking YOU something that should be answered by email. Set false for all automated notifications, platform alerts (JIRA, GitHub, CI/CD), banking, government portals, calendar invites, newsletters, and any sender with noreply/notifications in the address.
+
+              Output: {"category": "...", "needsReply": true|false}
+
+              From: ${header.CamelGoogleMailStreamFrom}
+              Subject: ${variable.cleanedSubject}
+              Body (may contain HTML, ignore all markup and focus on the text content only):
+              ---
+              ${variable.cleanedEmailBody}
+              ---
+        - log:
+            description: Log prompt
+            message: "Prompt: ${body}"
+        - to:
+            description: The triage agent
+            uri: langchain4j-agent:triage-agent
+            parameters:
+              agent: "#ollama"
+        - log:
+            description: Log LLM response
+            message: "LLM response: ${body}"
+        - setVariable:
+            description: Set triage category
+            jsonpath:
+              expression: $.category
+            name: triageCategory
+        - setVariable:
+            description: Set needsReply flag
+            jsonpath:
+              expression: $.needsReply
+            name: triageNeedsReply
+        - choice:
+            description: Handle known categories
+            otherwise:
+              steps: []
+            when:
+              - description: Valid category
+                steps:
+                  - to:
+                      description: Triage
+                      uri: direct:handle-triaged-email
+                  - choice:
+                      description: Draft reply if needed
+                      when:
+                        - description: Real sender
+                          steps:
+                            - wireTap:
+                                description: Draft reply
+                                uri: direct:draft-reply
+                          simple:
+                            expression: ${variable.triageNeedsReply} == true && ${header.CamelGoogleMailStreamFrom} !regex '(?i).*(noreply|no-reply|no_reply|donotreply|do-not-reply|do_not_reply|mailer-daemon|notifications|notify|alert|atlassian|jira|github|gitlab|bitbucket|confluence).*'
+                simple:
+                  expression: ${variable.triageCategory} in
+                    'URGENT,ACTION_REQUIRED,INFORMATIONAL,SUSPICIOUS,PURCHASE,SHIPPING'
+- route:
+    id: handle-triaged-email
+    description: Handles a successfully triaged email based on its category
+    from:
+      uri: direct:handle-triaged-email
+      steps:
+        - setVariable:
+            description: Add category label
+            name: addLabels
+            simple: ${variable.triageCategory}
+        - setVariable:
+            description: Remove INBOX label
+            name: removeLabels
+            constant: INBOX
+        - transformDataType:
+            toType: "google-mail:update-message-labels"
+        - to:
+            description: Update Gmail labels
+            uri: google-mail:messages/modify
+            parameters:
+              inBody: modifyMessageRequest
+              applicationName: camel-email-triage
+              userId: me
+- route:
+    id: draft-reply
+    description: Generate and save a draft reply
+    from:
+      uri: direct:draft-reply
+      steps:
+        - setBody:
+            description: Reply prompt
+            simple: |-
+              Draft a short, professional email reply (under 100 words). Output ONLY the reply body text, no subject, no metadata, no markdown.
+              Do NOT fabricate information. If you cannot answer, say you will follow up.
+
+              From: ${header.CamelGoogleMailStreamFrom}
+              Subject: ${variable.cleanedSubject}
+              Body: ${variable.cleanedEmailBody}
+        - to:
+            description: LLM reply
+            uri: langchain4j-agent:triage-agent
+            parameters:
+              agent: "#ollama"
+        - transformDataType:
+            toType: "google-mail:draft"
+        - to:
+            description: Save draft
+            uri: google-mail:drafts/create
+            parameters:
+              inBody: content
+              applicationName: camel-email-triage
+              userId: me
