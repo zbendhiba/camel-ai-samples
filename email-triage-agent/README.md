@@ -31,14 +31,34 @@ The agent reads unread emails, classifies them by urgency, summarizes content, a
 2. Make sure **2-Step Verification** is enabled. If not, enable it first.
 3. Once 2FA is active, go to https://myaccount.google.com/apppasswords
 4. Create a new App Password named `camel-email-agent`
-5. Export the credentials as environment variables:
+5. Copy the generated 16-character password into `application.properties`:
 
-```bash
-export MAIL_USERNAME="your-email@gmail.com"
-export MAIL_PASSWD="xxxx xxxx xxxx xxxx"
+```properties
+mail.username=your-email@gmail.com
+mail.password=xxxx xxxx xxxx xxxx
 ```
 
 ## Prerequisites
+
+### Maven Snapshots Repository
+
+Forage is not yet released in a final version. You need to add the Central Portal Snapshots repository to your Maven `~/.m2/settings.xml`:
+
+```xml
+<repository>
+    <id>central-portal-snapshots</id>
+    <name>Central Portal Snapshots</name>
+    <url>https://central.sonatype.com/repository/maven-snapshots/</url>
+    <releases>
+        <enabled>false</enabled>
+    </releases>
+    <snapshots>
+        <enabled>true</enabled>
+    </snapshots>
+</repository>
+```
+
+### Camel JBang CLI
 
 Install the [Camel JBang CLI](https://camel.apache.org/manual/camel-jbang.html) version 4.18.0:
 
@@ -46,11 +66,19 @@ Install the [Camel JBang CLI](https://camel.apache.org/manual/camel-jbang.html) 
 jbang app install -Dcamel.jbang.version=4.18.0 camel@apache/camel
 ```
 
+### Forage Plugin
+
+Install the Forage plugin for Camel JBang:
+
+```bash
+camel plugin add --gav io.kaoto.forage:camel-jbang-plugin-forage:1.1-SNAPSHOT forage
+```
+
 ## Running
 
 ```bash
 cd email-triage-agent
-camel run email-triage.camel.yaml --dev --logging-level=info
+camel forage run *
 ```
 
 ## Status
