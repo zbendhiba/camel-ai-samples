@@ -1,5 +1,5 @@
 - route:
-    id: read-emails
+    id: triage-email-main-agent
     from:
       uri: imaps
       parameters:
@@ -7,19 +7,14 @@
         host: //imap.gmail.com
         unseen: "true"
       steps:
-        - log:
-            message: "New email from ${header.From} — Subject: ${header.Subject}"
         - setVariable:
+            id: originalEmailBody
+            description: The original email content
             name: originalEmailBody
             simple: ${body}
-        - to:
-            uri: direct:triage
-- route:
-    id: triage-email
-    from:
-      uri: direct:triage
-      steps:
         - setBody:
+            id: prompt
+            description: Prompt for the main triage agent
             simple: >-
               You are an email triage assistant. Your job is to classify and
               summarize incoming emails.
@@ -52,16 +47,19 @@
               ## Email to classify From: ${header.From} Subject:
               ${header.Subject}
 
-              Body: ${body}
+              Body: ${variable.originalEmailBody}
         - to:
-            uri: langchain4j-agent:agent
+            description: The triage agent
+            uri: langchain4j-agent:triage-agent
             parameters:
               agent: "#ollama"
         - setVariable:
+            description: The category of the triaged email
             jsonpath:
               expression: $.category
             name: triageCategory
         - setVariable:
+            description: The summary of the triaged email
             jsonpath:
               expression: $.summary
             name: triageSummary
