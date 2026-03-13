@@ -1,25 +1,18 @@
 - route:
     id: triage-email-main-agent
     from:
-      uri: google-mail-stream:0
+      uri: imaps
       parameters:
-        clientId: "{{env:GMAIL_CLIENT_ID}}"
-        clientSecret: "{{env:GMAIL_CLIENT_SECRET}}"
-        refreshToken: "{{env:GMAIL_REFRESH_TOKEN}}"
-        applicationName: camel-email-triage
-        query: "is:unread"
-        markAsRead: "false"
-        delay: "10000"
+        delete: "false"
+        host: //imap.gmail.com
+        unseen: "true"
+        peek: "true"
       steps:
         - setVariable:
             id: originalEmailBody
             description: The original email content
             name: originalEmailBody
             simple: ${body}
-        - setVariable:
-            description: The Gmail message ID
-            name: gmailMessageId
-            simple: ${header.CamelGoogleMailId}
         - setBody:
             id: prompt
             description: Prompt for the main triage agent
@@ -90,9 +83,14 @@
     from:
       uri: direct:handle-triaged-email
       steps:
+        - setHeader:
+            name: moveTo
+            simple: ${variable.triageCategory}
         - log:
             message: >-
               Triage OK — Category: ${variable.triageCategory} |
               Subject: ${header.Subject} from ${header.From}
 
               Summary: ${variable.triageSummary}
+
+              Moving to folder: ${header.moveTo}
