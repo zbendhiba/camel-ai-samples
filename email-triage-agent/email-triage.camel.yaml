@@ -7,13 +7,20 @@
         host: //imap.gmail.com
         unseen: "true"
       steps:
-        - setBody:
-            simple: "Summarize the following email in 2-3 sentences. Include the key action items if any. \nFrom: ${header.From}\nSubject: ${header.Subject}\n\nEmail body:\n${body}"
+        - log:
+            message: "New email from ${header.From} — Subject: ${header.Subject}"
         - to:
-            id: to-3384
+            uri: direct:summarize
+- route:
+    id: summarize-email
+    from:
+      uri: direct:summarize
+      steps:
+        - setBody:
+            simple: "Summarize the following email in 2-3 sentences. Include the key action items if any.\n\nFrom: ${header.From}\nSubject: ${header.Subject}\n\nEmail body:\n${body}"
+        - to:
             uri: langchain4j-agent:agent
             parameters:
-              agent: '#ollama'
+              agent: "#ollama"
         - log:
-            id: log-4263
-            message: ${body}
+            message: "--- Summary for [${header.Subject}] from ${header.From} ---\n${body}"
