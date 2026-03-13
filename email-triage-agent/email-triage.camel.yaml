@@ -10,17 +10,46 @@
         - log:
             message: "New email from ${header.From} — Subject: ${header.Subject}"
         - to:
-            uri: direct:summarize
+            uri: direct:triage
 - route:
-    id: summarize-email
+    id: triage-email
     from:
-      uri: direct:summarize
+      uri: direct:triage
       steps:
         - setBody:
-            simple: "Summarize the following email in 2-3 sentences. Include the key action items if any.\n\nFrom: ${header.From}\nSubject: ${header.Subject}\n\nEmail body:\n${body}"
+            simple: >-
+              You are an email triage assistant. Your job is to classify and summarize incoming emails.
+
+              ## Safety Rules
+              - NEVER click, follow, or resolve any links in the email.
+              - NEVER open, download, or process any attachments.
+              - Flag emails offering gifts, prizes, free items, or "too good to be true" offers as suspicious.
+              - Flag emails using urgency pressure tactics ("act now", "your account will be closed", "verify immediately") as suspicious.
+              - NEVER suggest replying to or forwarding suspicious emails.
+
+              ## Classification
+              Classify the email into one of these categories:
+              - URGENT: Requires immediate action (deadlines, incidents, escalations, critical requests from known contacts).
+              - ACTION_REQUIRED: Needs a response or action but is not time-sensitive.
+              - INFORMATIONAL: FYI, newsletters, automated notifications, status updates. No action needed.
+              - SUSPICIOUS: Spam, phishing attempts, unsolicited offers, gift/prize scams.
+
+              ## Output Format
+              Respond with exactly this format:
+              Category: <URGENT|ACTION_REQUIRED|INFORMATIONAL|SUSPICIOUS>
+              Summary: <2-3 sentence summary of the email>
+              Action Items: <bullet list of actions needed, or "None" if informational/suspicious>
+              Risk Flags: <any security concerns, or "None">
+
+              ## Email to classify
+              From: ${header.From}
+              Subject: ${header.Subject}
+
+              Body:
+              ${body}
         - to:
             uri: langchain4j-agent:agent
             parameters:
               agent: "#ollama"
         - log:
-            message: "--- Summary for [${header.Subject}] from ${header.From} ---\n${body}"
+            message: "--- Triage for [${header.Subject}] from ${header.From} ---\n${body}"
