@@ -31,18 +31,26 @@ The agent reads unread emails, classifies them by urgency, summarizes content, a
 2. Make sure **2-Step Verification** is enabled. If not, enable it first.
 3. Once 2FA is active, go to https://myaccount.google.com/apppasswords
 4. Create a new App Password named `camel-email-agent`
-5. Copy the generated 16-character password into `application.properties`:
+5. Export the credentials as environment variables:
 
-```properties
-mail.username=your-email@gmail.com
-mail.password=xxxx xxxx xxxx xxxx
+```bash
+export MAIL_USERNAME="your-email@gmail.com"
+export MAIL_PASSWD="xxxx xxxx xxxx xxxx"
+```
+
+## Prerequisites
+
+Install the [Camel JBang CLI](https://camel.apache.org/manual/camel-jbang.html) version 4.18.0:
+
+```bash
+jbang app install -Dcamel.jbang.version=4.18.0 camel@apache/camel
 ```
 
 ## Running
 
 ```bash
 cd email-triage-agent
-camel run email-triage.camel.yaml
+camel run email-triage.camel.yaml --dev --logging-level=info
 ```
 
 ## Status
