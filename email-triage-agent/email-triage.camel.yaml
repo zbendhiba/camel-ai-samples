@@ -7,7 +7,7 @@
         clientSecret: "{{env:GMAIL_CLIENT_SECRET}}"
         refreshToken: "{{env:GMAIL_REFRESH_TOKEN}}"
         applicationName: camel-email-triage
-        query: "is:unread"
+        query: "is:unread in:inbox"
         markAsRead: "false"
         delay: "10000"
       steps:
