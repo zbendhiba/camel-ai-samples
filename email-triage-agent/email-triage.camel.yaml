@@ -3,13 +3,10 @@
     from:
       uri: google-mail-stream:0
       parameters:
-        clientId: "{{env:GMAIL_CLIENT_ID}}"
-        clientSecret: "{{env:GMAIL_CLIENT_SECRET}}"
-        refreshToken: "{{env:GMAIL_REFRESH_TOKEN}}"
         applicationName: camel-email-triage
-        query: "is:unread in:inbox"
-        markAsRead: "false"
         delay: "10000"
+        markAsRead: "false"
+        query: is:unread in:inbox
       steps:
         - setVariable:
             id: originalEmailBody
@@ -20,42 +17,38 @@
             description: The Gmail message ID
             name: gmailMessageId
             simple: ${header.CamelGoogleMailId}
+        - script:
+            description: Clean email body - strip URLs and decode HTML entities
+            groovy: |
+              // Clean the raw email body before sending it to the LLM.
+              // Marketing emails and newsletters contain huge tracking URLs
+              // and HTML entities that confuse small models and waste tokens.
+              // We strip URLs, decode HTML entities, remove decorative markers,
+              // collapse blank lines, and cap at 2000 chars.
+              def body = exchange.getVariable('originalEmailBody') ?: ''
+              body = body.replaceAll('\\(\\s*http[^)]*\\)', '')
+              body = body.replaceAll('https?://\\S+', '')
+              body = body.replaceAll('&apos;', "'")
+              body = body.replaceAll('&amp;', '&')
+              body = body.replaceAll('&lt;', '<')
+              body = body.replaceAll('&gt;', '>')
+              body = body.replaceAll('&quot;', '"')
+              body = body.replaceAll('\\*{2,}', '')
+              body = body.replaceAll('(?m)^\\s*$\\n', '')
+              body = body.trim()
+              if (body.length() > 2000) body = body.substring(0, 2000)
+              exchange.setVariable('cleanedEmailBody', body)
         - setBody:
             id: prompt
             description: Prompt for the main triage agent
-            simple: >-
-              You are an email triage assistant. Your job is to classify and
-              summarize incoming emails.
-
-              ## Safety Rules - NEVER click, follow, or resolve any links in the
-              email. - NEVER open, download, or process any attachments. - Flag
-              emails offering gifts, prizes, free items, or "too good to be
-              true" offers as suspicious. - Flag emails using urgency pressure
-              tactics ("act now", "your account will be closed", "verify
-              immediately") as suspicious. - NEVER suggest replying to or
-              forwarding suspicious emails.
-
-              ## Classification Classify the email into one of these categories:
-              - URGENT: Requires immediate action (deadlines, incidents,
-              escalations, critical requests from known contacts). -
-              ACTION_REQUIRED: Needs a response or action but is not
-              time-sensitive. - INFORMATIONAL: FYI, newsletters, automated
-              notifications, status updates. No action needed. - SUSPICIOUS:
-              Spam, phishing attempts, unsolicited offers, gift/prize scams.
-
-              ## Output Format Respond ONLY with a valid JSON object, no
-              markdown, no code fences, no extra text: {"category":
-              "URGENT|ACTION_REQUIRED|INFORMATIONAL|SUSPICIOUS", "summary": "2-3
-              sentence summary", "actionItems": ["item1", "item2"], "riskFlags":
-              ["flag1", "flag2"]}
-
-              Use empty arrays [] for actionItems and riskFlags when there are
-              none.
-
-              ## Email to classify From: ${header.From} Subject:
-              ${header.Subject}
-
-              Body: ${variable.originalEmailBody}
+            simple: |-
+              You are an email triage assistant. Your job is to classify and summarize incoming emails.
+              ## Safety Rules - NEVER click, follow, or resolve any links in the email. - NEVER open, download, or process any attachments. - Flag emails offering gifts, prizes, free items, or "too good to be true" offers as suspicious. - Flag emails using urgency pressure tactics ("act now", "your account will be closed", "verify immediately") as suspicious. - NEVER suggest replying to or forwarding suspicious emails.
+              ## Classification Classify the email into one of these categories: - URGENT: Requires immediate action (deadlines, incidents, escalations, critical requests from known contacts). - ACTION_REQUIRED: Needs a response or action but is not time-sensitive. - INFORMATIONAL: FYI, newsletters, automated notifications, status updates. No action needed. - SUSPICIOUS: Spam, phishing attempts, unsolicited offers, gift/prize scams. - PURCHASE: Purchase confirmations, invoices, receipts, order confirmations. - SHIPPING: Package tracking updates, delivery notifications, shipping confirmations.
+              ## Output Format Respond ONLY with a valid JSON object, no markdown, no code fences, no extra text: {"category": "URGENT|ACTION_REQUIRED|INFORMATIONAL|SUSPICIOUS|PURCHASE|SHIPPING", "summary": "2-3 sentence summary", "actionItems": ["item1", "item2"], "riskFlags": ["flag1", "flag2"]}
+              Use empty arrays [] for actionItems and riskFlags when there are none. Escape any special characters in string values to keep the JSON valid. Do not use markdown formatting, code fences, or any text outside the JSON object.
+              ## Email to classify From: ${header.CamelGoogleMailStreamFrom} Subject: ${header.CamelGoogleMailStreamSubject}
+              Body: ${variable.cleanedEmailBody}
         - to:
             description: The triage agent
             uri: langchain4j-agent:triage-agent
@@ -76,14 +69,14 @@
               steps:
                 - log:
                     message: Triage FAILED — invalid category '${variable.triageCategory}' in LLM
-                      response for ${header.Subject}
+                      response for ${header.CamelGoogleMailStreamSubject}
             when:
               - steps:
                   - to:
                       uri: direct:handle-triaged-email
                 simple:
                   expression: ${variable.triageCategory} in
-                    'URGENT,ACTION_REQUIRED,INFORMATIONAL,SUSPICIOUS'
+                    'URGENT,ACTION_REQUIRED,INFORMATIONAL,SUSPICIOUS,PURCHASE,SHIPPING'
 - route:
     id: handle-triaged-email
     description: Handles a successfully triaged email based on its category
@@ -92,7 +85,27 @@
       steps:
         - log:
             message: >-
-              Triage OK — Category: ${variable.triageCategory} |
-              Subject: ${header.Subject} from ${header.From}
+              Triage OK — Category: ${variable.triageCategory} | Subject:
+              ${header.CamelGoogleMailStreamSubject} from ${header.CamelGoogleMailStreamFrom}
 
               Summary: ${variable.triageSummary}
+        - setHeader:
+            description: Set Gmail user ID
+            name: CamelGoogleMailUserId
+            constant: me
+        - setHeader:
+            description: Set Gmail message ID for modification
+            name: CamelGoogleMailId
+            simple: ${variable.gmailMessageId}
+        - bean:
+            description: Build ModifyMessageRequest to move email to category label
+            beanType: GmailModifyHelper
+            method: moveToLabel
+        - to:
+            description: Move email to category label in Gmail
+            uri: google-mail:messages/modify
+            parameters:
+              inBody: modifyMessageRequest
+              applicationName: camel-email-triage
+        - log:
+            message: "Email moved to ${variable.triageCategory}: ${header.CamelGoogleMailStreamSubject}"

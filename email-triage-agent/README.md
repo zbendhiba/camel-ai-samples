@@ -1,28 +1,52 @@
 # Email Triage Agent
 
-A personal AI agent that reads your Gmail inbox, classifies emails by urgency, summarizes content, and can draft replies.
+A personal AI agent that reads your Gmail inbox, classifies emails into categories (urgent, informational, purchase, shipping, etc.), summarizes their content, and automatically moves them to the corresponding Gmail label.
 
-## Concept
+## What It Does
 
-Ask the agent things like:
-- "What's urgent in my inbox?"
-- "Summarize my unread emails from today"
-- "Draft a reply to the email from Alice about the deadline"
+The agent polls your Gmail inbox for unread emails, sends each one to a local LLM (Ollama) for classification, and moves the email to a matching Gmail label based on the result.
 
-The agent reads unread emails, classifies them by urgency, summarizes content, and can take action.
+Categories:
+- **URGENT** — Requires immediate action (deadlines, incidents, escalations)
+- **ACTION_REQUIRED** — Needs a response but is not time-sensitive
+- **INFORMATIONAL** — FYI, newsletters, automated notifications
+- **SUSPICIOUS** — Spam, phishing attempts, unsolicited offers
+- **PURCHASE** — Purchase confirmations, invoices, receipts
+- **SHIPPING** — Package tracking, delivery notifications
 
 ## Camel Components Used
 
-- **camel-google-mail** — Read inbox and manage labels via Gmail API
-- **camel-langchain4j-agent** — AI-powered email classification and summarization
+- **camel-google-mail-stream** — Poll Gmail inbox for unread emails
+- **camel-google-mail** — Move emails to labels via the Gmail API
+- **camel-langchain4j-agent** — AI-powered email classification and summarization (via Forage + Ollama)
+- **camel-groovy** — Email body cleaning (strip tracking URLs, decode HTML entities)
+- **camel-jsonpath** — Extract structured fields from LLM JSON responses
 
 ## Architecture
 
 - Camel JBang + LangChain4j + Forage for the agent runtime
 - Kaoto for visual route design
+- Ollama for local LLM inference
 - No database required — connects directly to Gmail via OAuth2
 
+## Project Structure
+
+- **email-triage.camel.yaml** — Main Camel routes: `triage-email-main-agent` (reads Gmail, cleans body, sends to LLM, extracts category) and `handle-triaged-email` (moves email to the matching Gmail label)
+- **GmailModifyHelper.java** — Java bean used by the route to move emails to Gmail labels. The Gmail API requires internal label IDs (e.g. `Label_5`), not label names (e.g. `INFORMATIONAL`). This bean resolves the mapping by listing all labels from the Gmail account via the `google-mail` Camel component and caching the result. Camel JBang automatically compiles and registers `.java` files placed in the same folder as the routes.
+- **forage-agent-factory.properties** — Forage configuration for the Ollama LLM agent (model name, base URL)
+- **application.properties** — Gmail OAuth2 credentials template (both consumer and producer)
+
 ## Prerequisites
+
+### Ollama
+
+Install [Ollama](https://ollama.com/) and pull a model:
+
+```bash
+ollama pull granite3.1-dense:8b
+```
+
+The model name is configured in `forage-agent-factory.properties`.
 
 ### Maven Snapshots Repository
 
@@ -102,23 +126,43 @@ On the first run, you may get a `PERMISSION_DENIED` error with a message like:
 
 Go to the URL provided in the error message and click **Enable** to activate the Gmail API for your project. Wait a few minutes and retry.
 
-### 6. Configure credentials
+### 6. Create Gmail labels
 
-Add your OAuth2 credentials to `application.properties`:
+The agent moves triaged emails into Gmail labels based on their category. You need to create these labels manually in your Gmail account:
+
+1. Go to [Gmail](https://mail.google.com/)
+2. In the left sidebar, scroll down and click **More** > **Create new label**
+3. Create the following labels:
+   - `URGENT`
+   - `ACTION_REQUIRED`
+   - `INFORMATIONAL`
+   - `SUSPICIOUS`
+   - `PURCHASE`
+   - `SHIPPING`
+
+### 7. Configure credentials
+
+Add your OAuth2 credentials to `application.properties` for both the stream consumer and the producer:
 
 ```properties
-camel.component.google-mail-stream.client-id=your-client-id
-camel.component.google-mail-stream.client-secret=your-client-secret
-camel.component.google-mail-stream.refresh-token=your-refresh-token
+# Consumer (reads inbox)
+camel.component.google-mail-stream.clientId=your-client-id
+camel.component.google-mail-stream.clientSecret=your-client-secret
+camel.component.google-mail-stream.refreshToken=your-refresh-token
+
+# Producer (moves emails to labels)
+camel.component.google-mail.clientId=your-client-id
+camel.component.google-mail.clientSecret=your-client-secret
+camel.component.google-mail.refreshToken=your-refresh-token
 ```
 
 ## Running
 
 ```bash
 cd email-triage-agent
-camel forage run *
+camel forage run * --dependency=mvn:org.apache.camel:camel-google-mail:4.18.0
 ```
 
 ## Status
 
-Work in progress — prototyping with Kaoto and Camel YAML DSL.
+Working — the agent reads unread emails, classifies them via Ollama, and moves them to Gmail labels. Future improvements: draft reply generation, guardrails for failed triage.
