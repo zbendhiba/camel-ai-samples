@@ -6,6 +6,7 @@
         delete: "false"
         host: //imap.gmail.com
         unseen: "true"
+        peek: "true"
       steps:
         - setVariable:
             id: originalEmailBody
@@ -71,12 +72,25 @@
                       response for ${header.Subject}
             when:
               - steps:
-                  - log:
-                      message: >-
-                        Triage OK — Category: ${variable.triageCategory} |
-                        Subject: ${header.Subject} from ${header.From}
-
-                        Summary: ${variable.triageSummary}
+                  - to:
+                      uri: direct:handle-triaged-email
                 simple:
                   expression: ${variable.triageCategory} in
                     'URGENT,ACTION_REQUIRED,INFORMATIONAL,SUSPICIOUS'
+- route:
+    id: handle-triaged-email
+    description: Handles a successfully triaged email based on its category
+    from:
+      uri: direct:handle-triaged-email
+      steps:
+        - setHeader:
+            name: moveTo
+            simple: ${variable.triageCategory}
+        - log:
+            message: >-
+              Triage OK — Category: ${variable.triageCategory} |
+              Subject: ${header.Subject} from ${header.From}
+
+              Summary: ${variable.triageSummary}
+
+              Moving to folder: ${header.moveTo}
