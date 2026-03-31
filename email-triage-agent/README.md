@@ -27,7 +27,7 @@ Categories:
 - Camel JBang + LangChain4j + Forage for the agent runtime
 - Kaoto for visual route design
 - Ollama for local LLM inference
-- No database required:connects directly to Gmail via OAuth2
+- No database required: connects directly to Gmail via OAuth2
 
 ## Project Structure
 
