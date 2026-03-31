@@ -4,7 +4,7 @@
       uri: imaps
       parameters:
         delete: "false"
-        host: imap.gmail.com
+        host: //imap.gmail.com
         unseen: "true"
         peek: "true"
       steps:
