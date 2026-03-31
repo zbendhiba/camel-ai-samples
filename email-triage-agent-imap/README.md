@@ -77,7 +77,7 @@ camel plugin add --gav io.kaoto.forage:camel-jbang-plugin-forage:1.1-SNAPSHOT fo
 ## Running
 
 ```bash
-cd email-triage-agent
+cd email-triage-agent-imap
 camel forage run *
 ```
 

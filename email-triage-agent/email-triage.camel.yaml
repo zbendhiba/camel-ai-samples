@@ -62,7 +62,10 @@
         - choice:
             description: Handle known categories
             otherwise:
-              steps: []
+              steps:
+                - log:
+                    description: Log unknown category
+                    message: "Triage FAILED — unknown category '${variable.triageCategory}' for ${header.CamelGoogleMailStreamSubject}"
             when:
               - description: Valid category
                 steps:
