@@ -1,0 +1,96 @@
+- route:
+    id: triage-email-main-agent
+    from:
+      uri: imaps
+      parameters:
+        delete: "false"
+        host: //imap.gmail.com
+        unseen: "true"
+        peek: "true"
+      steps:
+        - setVariable:
+            id: originalEmailBody
+            description: The original email content
+            name: originalEmailBody
+            simple: ${body}
+        - setBody:
+            id: prompt
+            description: Prompt for the main triage agent
+            simple: >-
+              You are an email triage assistant. Your job is to classify and
+              summarize incoming emails.
+
+              ## Safety Rules - NEVER click, follow, or resolve any links in the
+              email. - NEVER open, download, or process any attachments. - Flag
+              emails offering gifts, prizes, free items, or "too good to be
+              true" offers as suspicious. - Flag emails using urgency pressure
+              tactics ("act now", "your account will be closed", "verify
+              immediately") as suspicious. - NEVER suggest replying to or
+              forwarding suspicious emails.
+
+              ## Classification Classify the email into one of these categories:
+              - URGENT: Requires immediate action (deadlines, incidents,
+              escalations, critical requests from known contacts). -
+              ACTION_REQUIRED: Needs a response or action but is not
+              time-sensitive. - INFORMATIONAL: FYI, newsletters, automated
+              notifications, status updates. No action needed. - SUSPICIOUS:
+              Spam, phishing attempts, unsolicited offers, gift/prize scams.
+
+              ## Output Format Respond ONLY with a valid JSON object, no
+              markdown, no code fences, no extra text: {"category":
+              "URGENT|ACTION_REQUIRED|INFORMATIONAL|SUSPICIOUS", "summary": "2-3
+              sentence summary", "actionItems": ["item1", "item2"], "riskFlags":
+              ["flag1", "flag2"]}
+
+              Use empty arrays [] for actionItems and riskFlags when there are
+              none.
+
+              ## Email to classify From: ${header.From} Subject:
+              ${header.Subject}
+
+              Body: ${variable.originalEmailBody}
+        - to:
+            description: The triage agent
+            uri: langchain4j-agent:triage-agent
+            parameters:
+              agent: "#ollama"
+        - setVariable:
+            description: The category of the triaged email
+            jsonpath:
+              expression: $.category
+            name: triageCategory
+        - setVariable:
+            description: The summary of the triaged email
+            jsonpath:
+              expression: $.summary
+            name: triageSummary
+        - choice:
+            otherwise:
+              steps:
+                - log:
+                    message: Triage FAILED — invalid category '${variable.triageCategory}' in LLM
+                      response for ${header.Subject}
+            when:
+              - steps:
+                  - to:
+                      uri: direct:handle-triaged-email
+                simple:
+                  expression: ${variable.triageCategory} in
+                    'URGENT,ACTION_REQUIRED,INFORMATIONAL,SUSPICIOUS'
+- route:
+    id: handle-triaged-email
+    description: Handles a successfully triaged email based on its category
+    from:
+      uri: direct:handle-triaged-email
+      steps:
+        - setHeader:
+            name: moveTo
+            simple: ${variable.triageCategory}
+        - log:
+            message: >-
+              Triage OK — Category: ${variable.triageCategory} |
+              Subject: ${header.Subject} from ${header.From}
+
+              Summary: ${variable.triageSummary}
+
+              Moving to folder: ${header.moveTo}
