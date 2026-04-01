@@ -38,17 +38,13 @@
               ---
               ${variable.cleanedEmailBody}
               ---
-        - log:
-            description: Log prompt
-            message: "Prompt: ${body}"
         - to:
             description: The triage agent
             uri: langchain4j-agent:triage-agent
             parameters:
               agent: "#ollama"
         - log:
-            description: Log LLM response
-            message: "LLM response: ${body}"
+            message: "Triaged [${variable.cleanedSubject}]"
         - setVariable:
             description: Set triage category
             jsonpath:
@@ -96,6 +92,8 @@
             description: Remove INBOX label
             name: removeLabels
             constant: INBOX
+        - log:
+            message: "Moving [${variable.cleanedSubject}] to label ${variable.triageCategory}"
         - transformDataType:
             toType: "google-mail:update-message-labels"
         - to:
@@ -125,6 +123,8 @@
             uri: langchain4j-agent:triage-agent
             parameters:
               agent: "#ollama"
+        - log:
+            message: "Drafting reply for [${variable.cleanedSubject}]"
         - transformDataType:
             toType: "google-mail:draft"
         - to:
