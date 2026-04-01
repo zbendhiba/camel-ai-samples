@@ -27,7 +27,11 @@ Categories:
 - Camel JBang + LangChain4j + Forage for the agent runtime
 - Kaoto for visual route design
 - Ollama for local LLM inference
-- No database required:connects directly to Gmail via OAuth2
+- No database required: connects directly to Gmail via OAuth2
+
+## What is Forage?
+
+[Forage](https://kaotoio.github.io/forage/) is a bean factory for Apache Camel. Instead of writing Java code to create and configure a LangChain4j agent, you declare everything in a properties file (`forage-agent-factory.properties`). Forage creates the chat model, configures the Ollama connection, and registers the agent bean in the Camel registry. You just reference it in your route with `#ollama`. It works the same way for datasources, JMS connections, and more.
 
 ## Project Structure
 
@@ -36,7 +40,7 @@ Categories:
   - `handle-triaged-email`:Moves the email to the matching Gmail label
   - `draft-reply`:Generates and saves a draft reply
 
-  The routes use two built-in Camel DataType Transformers from `camel-google-mail`: `google-mail:update-message-labels` (add/remove labels) and `google-mail:draft` (create a draft reply). These transformers are available in Camel 4.19.0-SNAPSHOT and will ship with the 4.19 release.
+  The routes use two DataType Transformers from `camel-google-mail`, introduced in Camel 4.19. See [DataType Transformers for Gmail](#datatype-transformers-for-gmail) for details.
 - **HtmlDecodeFunction.java**:Custom Camel Simple function `${htmlDecode()}` that sanitizes email content before sending it to the LLM. See [Clean Email Subject and Body](#clean-email-subject-and-body) for details.
 - **forage-agent-factory.properties**:Forage configuration for the Ollama LLM agent (model name, base URL)
 - **application.properties**:Gmail OAuth2 credentials template (both consumer and producer)
@@ -55,38 +59,20 @@ I tested several local LLMs. Gemma3:4b won. See the [blog post](https://zinebben
 
 If your machine has more resources, you can use larger models (e.g. `gemma3:12b`, `qwen3.5:27b`). You can also use cloud-based models like Gemini or GPT by updating `forage-agent-factory.properties`.
 
-### Maven Snapshots Repository
-
-Forage is not yet released in a final version. You need to add the Central Portal Snapshots repository to your Maven `~/.m2/settings.xml`:
-
-```xml
-<repository>
-    <id>central-portal-snapshots</id>
-    <name>Central Portal Snapshots</name>
-    <url>https://central.sonatype.com/repository/maven-snapshots/</url>
-    <releases>
-        <enabled>false</enabled>
-    </releases>
-    <snapshots>
-        <enabled>true</enabled>
-    </snapshots>
-</repository>
-```
-
 ### Camel JBang CLI
 
-Install the [Camel JBang CLI](https://camel.apache.org/manual/camel-jbang.html). This example requires Camel 4.19.0-SNAPSHOT until 4.19 is released, because it uses DataType Transformers that are not yet available in a stable release:
+Install the [Camel JBang CLI](https://camel.apache.org/manual/camel-jbang.html). This example requires Camel 4.19 or later:
 
 ```bash
-jbang app install -Dcamel.jbang.version=4.19.0-SNAPSHOT camel@apache/camel
+jbang app install camel@apache/camel
 ```
 
 ### Forage Plugin
 
-Install the Forage plugin for Camel JBang:
+Install the [Forage](https://kaotoio.github.io/forage/) plugin for Camel JBang:
 
 ```bash
-camel plugin add --gav io.kaoto.forage:camel-jbang-plugin-forage:1.1-SNAPSHOT forage
+camel plugin add --gav io.kaoto.forage:camel-jbang-plugin-forage:1.1 forage
 ```
 
 ## Gmail API Setup
@@ -192,6 +178,69 @@ The fix: sanitize everything before it reaches the LLM. A custom Camel Simple fu
 ```
 
 After sanitization, the LLM only sees plain text. No HTML, no URLs, no injected prompts. Problem solved.
+
+### Custom Simple Function
+
+The sanitization logic lives in a plain Java class (`HtmlDecodeFunction.java`) that plugs directly into Camel's Simple language. This is possible thanks to the `SimpleFunction` interface, introduced in Camel 4.18.
+
+The class implements `SimpleFunction`, which requires three things: a function name (`htmlDecode`), whether it accepts null input, and an `apply` method that takes the exchange and the input value, and returns the transformed result. That's it.
+
+```java
+@BindToRegistry("html-decode-function")
+public class HtmlDecodeFunction implements SimpleFunction {
+
+    @Override
+    public String getName() {
+        return "htmlDecode";
+    }
+
+    @Override
+    public Object apply(Exchange exchange, Object input) throws Exception {
+        String text = Jsoup.parse(input.toString()).text();
+        text = text.replaceAll("\\(\\s*https?://[^)]*\\)|https?://\\S+", "");
+        return text.trim();
+    }
+}
+```
+
+`@BindToRegistry` registers the bean in the Camel registry at startup. Once registered, the function is available in any Simple expression as `${htmlDecode()}`. Combined with the `~>` chain operator (also introduced in Camel 4.18), you can pipe data through the function in a single line:
+
+```yaml
+simple:
+  expression: ${body} ~> ${htmlDecode()}
+```
+
+This reads as: take the message body, pass it through `htmlDecode()`, and use the result. No need for a processor bean or a separate route. The transformation stays right where it's used.
+
+### DataType Transformers for Gmail
+
+This project uses two DataType Transformers introduced in Camel 4.19 in the `camel-google-mail` component. They handle all the boilerplate of building Gmail API request objects, so you can just set a few variables and call `transformDataType`.
+
+**`google-mail:update-message-labels`**: moves an email to a Gmail label. Set `addLabels` and `removeLabels` variables, call the transformer, and it builds the `ModifyMessageRequest` for you.
+
+```yaml
+- setVariable:
+    name: addLabels
+    simple: ${variable.triageCategory}
+- setVariable:
+    name: removeLabels
+    constant: INBOX
+- transformDataType:
+    toType: "google-mail:update-message-labels"
+- to:
+    uri: google-mail:messages/modify
+```
+
+**`google-mail:draft`**: creates a draft reply from the LLM response. The transformer takes the body text and builds the full `Draft` object with the correct `In-Reply-To` and `References` headers.
+
+```yaml
+- transformDataType:
+    toType: "google-mail:draft"
+- to:
+    uri: google-mail:drafts/create
+```
+
+Without these transformers, you'd need Java code to manually construct `ModifyMessageRequest` and `Draft` objects with the Gmail API. The transformers keep everything in the YAML route.
 
 ### LLM Output Format
 
