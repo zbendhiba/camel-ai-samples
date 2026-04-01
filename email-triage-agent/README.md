@@ -23,7 +23,6 @@ Categories:
 - **camel-google-mail**:Move emails to labels via the Gmail API
 - **camel-langchain4j-agent**:AI-powered email classification and summarization (via Forage + Ollama)
 - **camel-jsonpath**:Extract structured fields from LLM JSON responses
-- **jsoup**:HTML parsing, tag stripping, and entity decoding
 
 ## Architecture
 
@@ -31,6 +30,10 @@ Categories:
 - Kaoto for visual route design
 - Ollama for local LLM inference
 - No database required: connects directly to Gmail via OAuth2
+
+### Visual Routes in Kaoto
+
+![Camel routes in Kaoto](kaoto-routes.png)
 
 ## What is Forage?
 
