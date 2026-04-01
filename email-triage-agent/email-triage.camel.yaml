@@ -38,17 +38,11 @@
               ---
               ${variable.cleanedEmailBody}
               ---
-        - log:
-            description: Log prompt
-            message: "Prompt: ${body}"
         - to:
             description: The triage agent
             uri: langchain4j-agent:triage-agent
             parameters:
               agent: "#ollama"
-        - log:
-            description: Log LLM response
-            message: "LLM response: ${body}"
         - setVariable:
             description: Set triage category
             jsonpath:

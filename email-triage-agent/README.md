@@ -20,7 +20,7 @@ Categories:
 - **camel-google-mail**:Move emails to labels via the Gmail API
 - **camel-langchain4j-agent**:AI-powered email classification and summarization (via Forage + Ollama)
 - **camel-jsonpath**:Extract structured fields from LLM JSON responses
-- **commons-text**:HTML entity decoding via `StringEscapeUtils.unescapeHtml4()`
+- **jsoup**:HTML parsing, tag stripping, and entity decoding
 
 ## Architecture
 
@@ -167,16 +167,22 @@ camel.component.google-mail.refreshToken=your-refresh-token
 
 ```bash
 cd email-triage-agent
-camel forage run * --dependency=mvn:org.apache.commons:commons-text:1.13.0
+camel forage run * --dependency=mvn:org.jsoup:jsoup:1.22.1
 ```
 
 ## Design Notes
 
-### Clean Email Subject and Body
+### Why You Need to Sanitize Emails Before Sending Them to an LLM
 
-Email subjects can contain HTML entities (e.g. `&apos;` in "OpenAI&apos;s Privacy Policy"). Email bodies are polluted with massive tracking URLs that can be thousands of characters long. Without cleaning, this noise overwhelms the LLM and breaks JSON output.
+I learned this the hard way. During testing, one email broke everything. The subject contained HTML entities (`&apos;` in "OpenAI&apos;s Privacy Policy"), so the LLM received garbled text. But the real problem was in the body.
 
-A custom Camel Simple function `${htmlDecode()}` (`HtmlDecodeFunction.java`) handles all the cleaning. Both subject and body are cleaned by chaining this function with the Simple `~>` operator:
+The email was full of tracking URLs. Not just short links. Massive URLs, thousands of characters long, with encoded parameters containing readable text. The LLM picked up that text and interpreted it as a second prompt. Instead of returning my nice JSON classification, the agent started responding with things like:
+
+> Do you want me to do anything else with this information, such as summarize it further?
+
+That's **indirect prompt injection**. The URLs injected instructions into the LLM's context, and the model followed them instead of doing its job. This is a known attack vector for LLM-based email processing. See [Weaponizing LLMs: Bypassing Email Security Products via Indirect Prompt Injection](https://www.immersivelabs.com/resources/c7-blog/weaponizing-llms-bypassing-email-security-products-via-indirect-prompt-injection) for a detailed analysis.
+
+The fix: sanitize everything before it reaches the LLM. A custom Camel Simple function `${htmlDecode()}` (`HtmlDecodeFunction.java`) handles this. It uses [Jsoup](https://jsoup.org/) to parse the HTML and extract clean text (strips tags, decodes all entities including `&apos;`, normalizes whitespace), then strips all URLs with a regex. Both subject and body are cleaned by chaining this function with the Simple `~>` operator:
 
 ```yaml
 - setVariable:
@@ -185,16 +191,7 @@ A custom Camel Simple function `${htmlDecode()}` (`HtmlDecodeFunction.java`) han
       expression: ${body} ~> ${htmlDecode()}
 ```
 
-The function performs the following steps:
-1. **Strip HTML tags**:removes any remaining HTML markup (`<[^>]+>`)
-2. **Strip URLs**:removes tracking URLs in parentheses (`( http://... )`) and bare URLs, which can be thousands of characters of noise
-3. **Decode `&apos;`**:handled manually because `StringEscapeUtils.unescapeHtml4()` from commons-text does not support this XML entity
-4. **Decode HTML entities**:converts `&amp;`, `&lt;`, `&gt;`, `&quot;`, and all other HTML4 entities via commons-text
-5. **Collapse whitespace**:replaces multiple consecutive spaces left by tag/URL stripping
-
-### URL Stripping as a Security Measure
-
-Stripping URLs also defends against indirect prompt injection. A crafted email could embed malicious instructions inside a URL. By removing all URLs before classification, the LLM only sees text content, never links.
+After sanitization, the LLM only sees plain text. No HTML, no URLs, no injected prompts. Problem solved.
 
 ### LLM Output Format
 
