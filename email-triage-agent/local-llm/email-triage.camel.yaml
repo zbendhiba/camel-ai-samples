@@ -40,7 +40,9 @@
               ---
         - to:
             description: The triage agent
-            uri: openai:chat-completion
+            uri: langchain4j-agent:triage-agent
+            parameters:
+              agent: "#ollama"
         - log:
             message: "Triaged [${variable.cleanedSubject}]"
         - setVariable:
@@ -118,7 +120,9 @@
               Body: ${variable.cleanedEmailBody}
         - to:
             description: LLM reply
-            uri: openai:chat-completion
+            uri: langchain4j-agent:triage-agent
+            parameters:
+              agent: "#ollama"
         - log:
             message: "Drafting reply for [${variable.cleanedSubject}]"
         - transformDataType:
