@@ -37,9 +37,14 @@ camel plugin add --gav io.kaoto.forage:camel-jbang-plugin-forage:1.1 forage
 
 [Forage](https://kaotoio.github.io/forage/) is a bean factory for Apache Camel. Instead of writing Java code to create and configure a LangChain4j agent, you declare everything in a properties file (`forage-agent-factory.properties`). Forage creates the chat model, configures the Ollama connection, and registers the agent bean in the Camel registry. You just reference it in your route with `#ollama`. It works the same way for datasources, JMS connections, and more.
 
+### Visual Routes in Kaoto
+
+![Camel routes in Kaoto](kaoto-flow.png)
+
 ## Running
 
 ```bash
-cd email-triage-agent/local-llm
-camel forage run * ../HtmlDecodeFunction.java ../application.properties --dependency=mvn:org.jsoup:jsoup:1.22.1
+$cd email-triage-agent/local-llm
+
+$camel forage run * ../HtmlDecodeFunction.java ../application.properties --dependency=mvn:org.jsoup:jsoup:1.22.1
 ```

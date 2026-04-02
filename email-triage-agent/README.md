@@ -35,7 +35,7 @@ Categories:
 
 ### Visual Routes in Kaoto
 
-![Camel routes in Kaoto](kaoto-routes.png)
+![Camel routes in Kaoto](kaoto-flow.png)
 
 ## Project Structure
 
@@ -79,7 +79,7 @@ Get an API key from [OpenAI](https://platform.openai.com/api-keys). You can eith
 Install the [Camel JBang CLI](https://camel.apache.org/manual/camel-jbang.html). This example requires Camel 4.19 or later:
 
 ```bash
-jbang app install camel@apache/camel
+$ jbang app install camel@apache/camel
 ```
 
 ## Gmail API Setup
