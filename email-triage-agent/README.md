@@ -159,8 +159,8 @@ camel.component.google-mail.refreshToken=your-refresh-token
 ## Running
 
 ```bash
-cd email-triage-agent
-camel run * --dependency=mvn:org.jsoup:jsoup:1.22.1
+$ cd email-triage-agent
+$ camel run * --dependency=mvn:org.jsoup:jsoup:1.22.1
 ```
 
 ## Design Notes
