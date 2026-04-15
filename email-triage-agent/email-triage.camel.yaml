@@ -78,7 +78,7 @@
                               '(?i).*(noreply|no-reply|no_reply|donotreply|do-not-reply|do_not_reply|mailer-daemon|notifications|notify|alert|atlassian|jira|github|gitlab|bitbucket|confluence).*'
                 simple:
                   expression: ${variable.triageCategory} in
-                    'URGENT,ACTION_REQUIRED,INFORMATIONAL,SUSPICIOUS,PURCHASE,SHIPPING'
+                    'URGENT,ACTION_REQUIRED,INFORMATIONAL,SECURITY_ALERT,PURCHASE,SHIPPING'
 - route:
     id: handle-triaged-email
     description: Handles a successfully triaged email based on its category

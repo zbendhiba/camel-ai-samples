@@ -1,0 +1,31 @@
+{
+    "type": "object",
+    "properties": {
+        "rationale": {
+            "type": "string",
+            "description": "Step-by-step reasoning about the classification."
+        },
+        "category": {
+            "type": "string",
+            "description": "The email category.",
+            "enum": [
+                "URGENT",
+                "ACTION_REQUIRED",
+                "INFORMATIONAL",
+                "SECURITY_ALERT",
+                "PURCHASE",
+                "SHIPPING"
+            ]
+        },
+        "needsReply": {
+            "type": "boolean",
+            "description": "Whether the email needs a reply."
+        }
+    },
+    "required": [
+        "rationale",
+        "category",
+        "needsReply"
+    ],
+    "additionalProperties": false
+}

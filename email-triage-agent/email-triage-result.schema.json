@@ -1,14 +1,18 @@
 {
     "type": "object",
     "properties": {
+        "rationale": {
+            "type": "string",
+            "description": "Step-by-step reasoning. First, identify the email's core intent (e.g., incident report, newsletter, order confirmation). Second, check for urgency signals (deadlines, security alerts, escalations). Third, choose the category that best matches. Definitions: URGENT (deadlines, incidents, escalations), ACTION_REQUIRED (asks you to do something/reply), INFORMATIONAL (FYI, newsletters, automated notifications that require no action), SECURITY_ALERT (security alerts, CVEs, breach notifications, suspicious login attempts), PURCHASE (orders, invoices), SHIPPING (tracking, delivery updates). Rules: If in doubt between ACTION_REQUIRED and INFORMATIONAL, choose ACTION_REQUIRED. State which category you choose and why."
+        },
         "category": {
             "type": "string",
-            "description": "The classification category for the email. Definitions: URGENT (deadlines, incidents, escalations, security alerts, CVEs, breach notifications, suspicious login attempts), ACTION_REQUIRED (asks you to do something/reply), INFORMATIONAL (FYI, newsletters, automated notifications that require no action), SUSPICIOUS (spam, phishing, urgency pressure), PURCHASE (orders, invoices), SHIPPING (tracking, delivery updates). Rules: Security alerts are always URGENT, even if automated. If in doubt between ACTION_REQUIRED and INFORMATIONAL, choose ACTION_REQUIRED.",
+            "description": "The category chosen in the rationale above.",
             "enum": [
                 "URGENT",
                 "ACTION_REQUIRED",
                 "INFORMATIONAL",
-                "SUSPICIOUS",
+                "SECURITY_ALERT",
                 "PURCHASE",
                 "SHIPPING"
             ]
@@ -19,6 +23,7 @@
         }
     },
     "required": [
+        "rationale",
         "category",
         "needsReply"
     ],

@@ -1,0 +1,17 @@
+Input: From: jira@company.atlassian.net Subject: [JIRA] Updated: PROJ-123 Body: John changed the status to In Progress.
+Output: {"rationale": "This is an automated JIRA notification about a ticket status change. No action needed from the recipient. The sender is an automated system.", "category": "INFORMATIONAL", "needsReply": false}
+
+Input: From: boss@company.com Subject: Q3 report needed by Friday Body: Can you send me the Q3 report by end of day Friday? Thanks.
+Output: {"rationale": "The boss is directly asking for a deliverable with a deadline. This requires action and a reply.", "category": "ACTION_REQUIRED", "needsReply": true}
+
+Input: From: alerts@aws.amazon.com Subject: AWS Security Alert Body: We detected unusual sign-in activity on your AWS account from IP 203.0.113.42.
+Output: {"rationale": "This is an automated security alert about suspicious login activity. It is a security notification from an automated system.", "category": "SECURITY_ALERT", "needsReply": false}
+
+Input: From: colleague@company.com Subject: Coffee Thursday? Body: Hey, want to grab coffee Thursday afternoon? I found a nice spot near the office.
+Output: {"rationale": "A colleague is directly asking to meet for coffee. This is a personal request that needs a reply to confirm or decline.", "category": "ACTION_REQUIRED", "needsReply": true}
+
+Input: From: amazon@shipping.com Subject: Your package is on the way Body: Your order #123-456 has shipped and will arrive by Wednesday.
+Output: {"rationale": "This is an automated shipping notification about a package delivery. No reply needed.", "category": "SHIPPING", "needsReply": false}
+
+Input: From: thomas@company.com Subject: Q3 Migration - Updated Plan Body: Hi team, here is the updated timeline. @James: finalize rollback playbook. @All: review the runbook and add comments by end of week. Next sync Thursday 10AM.
+Output: {"rationale": "This is a team-wide status update with action items. The sender is informing the team, not directly asking the recipient to reply by email.", "category": "ACTION_REQUIRED", "needsReply": false}
