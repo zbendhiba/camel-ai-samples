@@ -7,7 +7,7 @@ A personal AI agent that reads your Gmail inbox, classifies emails into categori
 
 ## What It Does
 
-The agent polls your Gmail inbox for unread emails, sends each one to an LLM for classification, and moves the email to a matching Gmail label based on the result. It uses [Gemma 4](https://ollama.com/library/gemma4) via Ollama by default, but works with any OpenAI-compatible API including OpenAI GPT-5.
+The agent polls your Gmail inbox for unread emails, sends each one to an LLM for classification, and moves the email to a matching Gmail label based on the result. It uses OpenAI GPT-5 by default, but works with any OpenAI-compatible API including local LLMs via Ollama.
 
 Categories:
 - **URGENT**: Requires immediate action (deadlines, incidents, escalations)
@@ -28,7 +28,7 @@ Categories:
 
 - Camel JBang for the runtime
 - Kaoto for visual route design
-- Gemma 4 via Ollama for LLM inference (or OpenAI GPT-5)
+- OpenAI GPT-5 for LLM inference (or any OpenAI-compatible API)
 - No database required: connects directly to Gmail via OAuth2
 
 ### Visual Routes in Kaoto
@@ -49,31 +49,11 @@ Categories:
 
 ## LLM Setup
 
-The default configuration uses [Gemma 4](https://ollama.com/library/gemma4) via [Ollama](https://ollama.com/). The `camel-openai` component talks to any OpenAI-compatible API, so the same route works with both local and cloud models.
+The `camel-openai` component talks to any OpenAI-compatible API, so the same route works with both cloud and local models.
 
-### Default: Gemma 4 via Ollama
+### Default: OpenAI GPT-5
 
-Install [Ollama](https://ollama.com/) and start the model:
-
-```bash
-ollama run gemma4:e4b
-```
-
-This downloads the model (first time only) and keeps it loaded. Leave it running in a separate terminal.
-
-The default `application.properties` is already configured for Ollama:
-
-```properties
-camel.component.openai.model=gemma4:e4b
-camel.component.openai.baseUrl=http://localhost:11434/v1
-camel.component.openai.apiKey=ollama
-```
-
-The `apiKey` is required by the OpenAI SDK but Ollama ignores it. Any value works.
-
-### Alternative: OpenAI GPT-5
-
-To use OpenAI instead, update `application.properties`: remove the `baseUrl` line and replace the `apiKey` with your real key:
+The default `application.properties` is configured for OpenAI:
 
 ```properties
 camel.component.openai.model=gpt-5.4-mini
@@ -81,6 +61,20 @@ camel.component.openai.apiKey=<YOUR_OPENAI_API_KEY>
 ```
 
 You can also set the API key via the `OPENAI_API_KEY` environment variable.
+
+### Alternative: Local LLM via Ollama
+
+To use a local LLM that supports OpenAI-style structured output, add the `baseUrl` pointing to your local server:
+
+```properties
+camel.component.openai.model=your-model
+camel.component.openai.baseUrl=http://localhost:11434/v1
+camel.component.openai.apiKey=ollama
+```
+
+The `apiKey` is required by the OpenAI SDK but Ollama ignores it. Any value works.
+
+If you run into limitations with small models or Ollama-specific issues, the [local-llm/](local-llm/) directory contains a variant using Gemma 4 with a system prompt and few-shot examples pattern that works reliably. See [this blog post](https://zbendhiba.github.io/posts/structured-output-broke-my-local-email-triage-agent-here-s-how-i-fixed-it/) for why Gemma 4 was chosen and how the system prompt pattern fixes structured output on small local models.
 
 ### Camel JBang CLI
 
