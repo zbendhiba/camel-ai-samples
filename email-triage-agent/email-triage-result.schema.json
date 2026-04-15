@@ -3,7 +3,7 @@
     "properties": {
         "category": {
             "type": "string",
-            "description": "The classification category for the email.",
+            "description": "The classification category for the email. Definitions: URGENT (deadlines, incidents, escalations, security alerts, CVEs, breach notifications, suspicious login attempts), ACTION_REQUIRED (asks you to do something/reply), INFORMATIONAL (FYI, newsletters, automated notifications that require no action), SUSPICIOUS (spam, phishing, urgency pressure), PURCHASE (orders, invoices), SHIPPING (tracking, delivery updates). Rules: Security alerts are always URGENT, even if automated. If in doubt between ACTION_REQUIRED and INFORMATIONAL, choose ACTION_REQUIRED.",
             "enum": [
                 "URGENT",
                 "ACTION_REQUIRED",

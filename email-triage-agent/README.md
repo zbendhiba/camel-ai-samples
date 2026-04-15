@@ -261,7 +261,7 @@ The triage step uses the OpenAI component's `jsonSchema` parameter to enforce st
       jsonSchema: "resource:classpath:email-triage-result.schema.json"
 ```
 
-The schema constrains the `category` field to an enum of valid values (URGENT, ACTION_REQUIRED, INFORMATIONAL, SUSPICIOUS, PURCHASE, SHIPPING) and `needsReply` to a boolean. This eliminates malformed JSON, unexpected fields, and invalid categories, so the prompt can focus purely on classification logic without JSON formatting instructions.
+The schema carries all the classification logic: category definitions, tiebreaker rules, and `needsReply` semantics are in the field `description` attributes. The `enum` constrains the category to valid values, the `boolean` type guarantees true/false for `needsReply`. This means the prompt can be minimal ("Classify the following email" + email content) while the schema handles everything else.
 
 ### Fire-and-Forget for Draft Replies
 

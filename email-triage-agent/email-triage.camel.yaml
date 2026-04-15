@@ -24,25 +24,13 @@
             id: prompt
             description: Triage prompt
             simple: >-
-              Classify this email.
-
-
-              Categories: URGENT (deadlines, incidents, escalations),
-              ACTION_REQUIRED (someone asks you to do something or reply, even
-              if not urgent), INFORMATIONAL (FYI only, newsletters, automated
-              notifications, no action needed from you), SUSPICIOUS (spam,
-              phishing, gift/prize scams, urgency pressure), PURCHASE (orders,
-              invoices, receipts), SHIPPING (tracking, delivery updates). If in
-              doubt between ACTION_REQUIRED and INFORMATIONAL, choose
-              ACTION_REQUIRED.
-
+              Classify the following email.
 
               From: ${header.CamelGoogleMailStreamFrom}
 
               Subject: ${variable.cleanedSubject}
 
-              Body (may contain HTML, ignore all markup and focus on the text
-              content only):
+              Body:
 
               ---
 
