@@ -23,26 +23,46 @@
         - setBody:
             id: prompt
             description: Triage prompt
-            simple: |-
-              Classify this email. Respond with ONLY the JSON object. Do NOT wrap it in ```json``` or any markdown. Do NOT add any text before or after the JSON.
+            simple: >-
+              Classify this email.
 
-              Categories: URGENT (deadlines, incidents, escalations), ACTION_REQUIRED (someone asks you to do something or reply — even if not urgent), INFORMATIONAL (FYI only, newsletters, automated notifications, no action needed from you), SUSPICIOUS (spam, phishing, gift/prize scams, urgency pressure), PURCHASE (orders, invoices, receipts), SHIPPING (tracking, delivery updates). If in doubt between ACTION_REQUIRED and INFORMATIONAL, choose ACTION_REQUIRED.
 
-              Set needsReply=true ONLY if a real person is directly asking YOU something that should be answered by email. Set false for all automated notifications, platform alerts (JIRA, GitHub, CI/CD), banking, government portals, calendar invites, newsletters, and any sender with noreply/notifications in the address.
+              Categories: URGENT (deadlines, incidents, escalations),
+              ACTION_REQUIRED (someone asks you to do something or reply, even
+              if not urgent), INFORMATIONAL (FYI only, newsletters, automated
+              notifications, no action needed from you), SUSPICIOUS (spam,
+              phishing, gift/prize scams, urgency pressure), PURCHASE (orders,
+              invoices, receipts), SHIPPING (tracking, delivery updates). If in
+              doubt between ACTION_REQUIRED and INFORMATIONAL, choose
+              ACTION_REQUIRED.
 
-              Output: {"category": "...", "needsReply": true|false}
+
+              Set needsReply=true ONLY if a real person is directly asking YOU
+              something that should be answered by email. Set false for all
+              automated notifications, platform alerts (JIRA, GitHub, CI/CD),
+              banking, government portals, calendar invites, newsletters, and
+              any sender with noreply/notifications in the address.
+
 
               From: ${header.CamelGoogleMailStreamFrom}
+
               Subject: ${variable.cleanedSubject}
-              Body (may contain HTML, ignore all markup and focus on the text content only):
+
+              Body (may contain HTML, ignore all markup and focus on the text
+              content only):
+
               ---
+
               ${variable.cleanedEmailBody}
+
               ---
         - to:
             description: The triage agent
             uri: openai:chat-completion
+            parameters:
+              jsonSchema: "resource:classpath:email-triage-result.schema.json"
         - log:
-            message: "Triaged [${variable.cleanedSubject}]"
+            message: Triaged [${variable.cleanedSubject}]
         - setVariable:
             description: Set triage category
             jsonpath:
@@ -72,7 +92,9 @@
                                 description: Draft reply
                                 uri: direct:draft-reply
                           simple:
-                            expression: ${variable.triageNeedsReply} == true && ${header.CamelGoogleMailStreamFrom} !regex '(?i).*(noreply|no-reply|no_reply|donotreply|do-not-reply|do_not_reply|mailer-daemon|notifications|notify|alert|atlassian|jira|github|gitlab|bitbucket|confluence).*'
+                            expression: ${variable.triageNeedsReply} == true &&
+                              ${header.CamelGoogleMailStreamFrom} !regex
+                              '(?i).*(noreply|no-reply|no_reply|donotreply|do-not-reply|do_not_reply|mailer-daemon|notifications|notify|alert|atlassian|jira|github|gitlab|bitbucket|confluence).*'
                 simple:
                   expression: ${variable.triageCategory} in
                     'URGENT,ACTION_REQUIRED,INFORMATIONAL,SUSPICIOUS,PURCHASE,SHIPPING'
@@ -91,9 +113,9 @@
             name: removeLabels
             constant: INBOX
         - log:
-            message: "Moving [${variable.cleanedSubject}] to label ${variable.triageCategory}"
+            message: Moving [${variable.cleanedSubject}] to label ${variable.triageCategory}
         - transformDataType:
-            toType: "google-mail:update-message-labels"
+            toType: google-mail:update-message-labels
         - to:
             description: Update Gmail labels
             uri: google-mail:messages/modify
@@ -109,20 +131,26 @@
       steps:
         - setBody:
             description: Reply prompt
-            simple: |-
-              Draft a short, professional email reply (under 100 words). Output ONLY the reply body text, no subject, no metadata, no markdown.
-              Do NOT fabricate information. If you cannot answer, say you will follow up.
+            simple: >-
+              Draft a short, professional email reply (under 100 words). Output
+              ONLY the reply body text, no subject, no metadata, no markdown.
+
+              Do NOT fabricate information. If you cannot answer, say you will
+              follow up.
+
 
               From: ${header.CamelGoogleMailStreamFrom}
+
               Subject: ${variable.cleanedSubject}
+
               Body: ${variable.cleanedEmailBody}
         - to:
             description: LLM reply
             uri: openai:chat-completion
         - log:
-            message: "Drafting reply for [${variable.cleanedSubject}]"
+            message: Drafting reply for [${variable.cleanedSubject}]
         - transformDataType:
-            toType: "google-mail:draft"
+            toType: google-mail:draft
         - to:
             description: Save draft
             uri: google-mail:drafts/create

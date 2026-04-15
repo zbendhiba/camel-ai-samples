@@ -21,7 +21,7 @@ Categories:
 
 ## Camel Components Used
 
-- **camel-openai**: AI-powered email classification and summarization via OpenAI
+- **camel-openai**: AI-powered email classification and summarization via OpenAI, with structured output (JSON Schema)
 - **camel-google-mail-stream**: Poll Gmail inbox for unread emails
 - **camel-google-mail**: Move emails to labels via the Gmail API
 - **camel-jsonpath**: Extract structured fields from LLM JSON responses
@@ -46,7 +46,8 @@ Categories:
 
   The routes use two DataType Transformers from `camel-google-mail`, introduced in Camel 4.19. See [DataType Transformers for Gmail](#datatype-transformers-for-gmail) for details.
 - **HtmlDecodeFunction.java**: Custom Camel Simple function `${htmlDecode()}` that sanitizes email content before sending it to the LLM. See [Clean Email Subject and Body](#clean-email-subject-and-body) for details.
-- **application.properties**: OpenAI model config + Gmail OAuth2 credentials template
+- **email-triage-result.schema.json**: JSON Schema for the triage output, used by the OpenAI component's structured output feature to guarantee valid responses
+- **application.properties**: OpenAI model config, Gmail OAuth2 credentials template, and external dependencies
 - **local-llm/**: Alternative variant using LangChain4j + Ollama for local LLM inference
 
 ## Choosing an OpenAI Model
@@ -55,9 +56,9 @@ The default model is `gpt-4.1`. Here is what we observed during testing:
 
 | Model | Triage quality | Notes |
 |-------|---------------|-------|
-| **gpt-4.1** | Best | Accurate classification, reliable JSON output, good at following structured instructions |
+| **gpt-4.1** | Best | Accurate classification, good at following structured instructions |
 | **gpt-4o** | Acceptable | Slightly less precise on edge cases (e.g. over-classifies some notifications as URGENT) |
-| **gpt-4o-mini** | Not suitable | Hallucinates replies, miscategorizes emails, unreliable JSON output |
+| **gpt-4o-mini** | Not suitable | Hallucinates replies, miscategorizes emails |
 | **gpt-4.1-mini** | Not suitable | Same issues as gpt-4o-mini |
 
 You can change the model in `application.properties`:
@@ -160,7 +161,7 @@ camel.component.google-mail.refreshToken=your-refresh-token
 
 ```bash
 $ cd email-triage-agent
-$ camel run * --dependency=mvn:org.jsoup:jsoup:1.22.1
+$ camel run *
 ```
 
 ## Design Notes
@@ -249,9 +250,18 @@ This project uses two DataType Transformers introduced in Camel 4.19 in the `cam
 
 Without these transformers, you'd need Java code to manually construct `ModifyMessageRequest` and `Draft` objects with the Gmail API. The transformers keep everything in the YAML route.
 
-### LLM Output Format
+### Structured Output with JSON Schema
 
-Some local models (e.g. Gemma3) wrap JSON responses in markdown code fences even when told not to. Adding explicit negative instructions in the prompt ("Do NOT wrap it in \`\`\`json\`\`\` or any markdown") fixed this without needing post-processing.
+The triage step uses the OpenAI component's `jsonSchema` parameter to enforce structured output. Instead of relying on prompt instructions to produce valid JSON, the schema (`email-triage-result.schema.json`) is passed directly to the OpenAI API, which guarantees the response conforms to the defined structure:
+
+```yaml
+- to:
+    uri: openai:chat-completion
+    parameters:
+      jsonSchema: "resource:classpath:email-triage-result.schema.json"
+```
+
+The schema constrains the `category` field to an enum of valid values (URGENT, ACTION_REQUIRED, INFORMATIONAL, SUSPICIOUS, PURCHASE, SHIPPING) and `needsReply` to a boolean. This eliminates malformed JSON, unexpected fields, and invalid categories, so the prompt can focus purely on classification logic without JSON formatting instructions.
 
 ### Defense in Depth for needsReply
 

@@ -1,0 +1,26 @@
+{
+    "type": "object",
+    "properties": {
+        "category": {
+            "type": "string",
+            "description": "The classification category for the email.",
+            "enum": [
+                "URGENT",
+                "ACTION_REQUIRED",
+                "INFORMATIONAL",
+                "SUSPICIOUS",
+                "PURCHASE",
+                "SHIPPING"
+            ]
+        },
+        "needsReply": {
+            "type": "boolean",
+            "description": "Whether the email needs a reply. True ONLY if a real person is directly asking the recipient something that should be answered by email. False for all automated notifications, platform alerts (JIRA, GitHub, CI/CD), banking, government portals, calendar invites, newsletters, and any sender with noreply/notifications in the address."
+        }
+    },
+    "required": [
+        "category",
+        "needsReply"
+    ],
+    "additionalProperties": false
+}
