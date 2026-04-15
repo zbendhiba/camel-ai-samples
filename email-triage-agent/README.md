@@ -263,10 +263,6 @@ The triage step uses the OpenAI component's `jsonSchema` parameter to enforce st
 
 The schema constrains the `category` field to an enum of valid values (URGENT, ACTION_REQUIRED, INFORMATIONAL, SUSPICIOUS, PURCHASE, SHIPPING) and `needsReply` to a boolean. This eliminates malformed JSON, unexpected fields, and invalid categories, so the prompt can focus purely on classification logic without JSON formatting instructions.
 
-### Defense in Depth for needsReply
-
-A regex filter acts as a safety net on top of the LLM. Even if the model says `needsReply=true`, the agent won't draft a reply if the sender matches `noreply`, `notifications`, `jira`, `github`, etc.
-
 ### Fire-and-Forget for Draft Replies
 
 The main route uses Camel's Wire Tap pattern to move the email to its label immediately and generate the draft reply asynchronously. The inbox gets organized in seconds. The draft appears a few seconds later.

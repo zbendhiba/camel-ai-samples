@@ -37,13 +37,6 @@
               ACTION_REQUIRED.
 
 
-              Set needsReply=true ONLY if a real person is directly asking YOU
-              something that should be answered by email. Set false for all
-              automated notifications, platform alerts (JIRA, GitHub, CI/CD),
-              banking, government portals, calendar invites, newsletters, and
-              any sender with noreply/notifications in the address.
-
-
               From: ${header.CamelGoogleMailStreamFrom}
 
               Subject: ${variable.cleanedSubject}
