@@ -1,8 +1,39 @@
 # langchain4j-enterprise-rag
 
+Enterprise RAG, the integration way. Camel ingests a hospital's HL7v2 feed, enriches
+it with FHIR, and keeps a Qdrant vector store in sync. A Quarkus LangChain4j AI
+service answers ward questions, grounded and with citations.
+
+The full scenario and the flow diagram are in [SCENARIO.md](SCENARIO.md).
+
 This project uses Quarkus, the Supersonic Subatomic Java Framework.
 
 If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+
+## The dataset
+
+All patient data is synthetic, generated with
+[Synthea™](https://github.com/synthetichealth/synthea), the Synthetic Patient
+Population Simulator (Apache-2.0, by MITRE).
+
+- `src/main/resources/data/synthea/` holds 20 patients as **FHIR R4 transaction
+  bundles** in JSON. Every entry carries a POST request, so seeding the HAPI FHIR
+  server is a plain POST of each file to the server root: the server creates the
+  resources and resolves the references between them. No transformation needed.
+- These files are **not** ingested into the vector store. They only bootstrap the
+  demo's FHIR server, the "live system" the example talks to. The knowledge flows
+  in through the HL7v2 feed and the FHIR queries, never from files.
+- The dataset is reproducible: fixed seeds, fixed reference date, pinned Synthea™
+  version. Regenerate or extend it with:
+
+  ```shell script
+  jbang GenerateDataset.java
+  ```
+
+  The script downloads the pinned Synthea™ release once (~200 MB, into `target/`),
+  keeps only living patients, and slims each bundle to the resources the example
+  uses: Patient, Encounter, Condition, MedicationRequest, AllergyIntolerance,
+  Immunization (~2 MB in total instead of tens of MB).
 
 ## Running the application in dev mode
 
