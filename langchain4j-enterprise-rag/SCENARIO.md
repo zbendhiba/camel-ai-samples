@@ -22,35 +22,135 @@ No AI stack can embed that and get anything useful back. There is no file to con
 no document to load. The document has to be **built** from live systems, and rebuilt
 every time they change. That is an integration problem. Camel's problem.
 
+### HL7v2 for the rest of us
+
+HL7v2 is a pipe-separated format from 1987 where column positions carry the meaning.
+One line per segment, named by its first three letters; `^` splits a column into parts.
+
+| Line | What it says |
+|---|---|
+| `MSH\|...\|LAB\|ACME^HOSP\|EHR\|...\|ORU^R01\|MSG0042\|...` | The envelope: the lab of ACME hospital tells the EHR "here is a lab result" (`ORU^R01`), message number MSG0042 |
+| `PID\|1\|\|PAT-123\|\|DUPONT^MARIE\|\|19560312\|F` | The patient: id PAT-123, name Dupont Marie, born 1956-03-12, female |
+| `OBX\|1\|NM\|2345-7^GLUCOSE^LN\|\|182\|mg/dL\|70-99\|H\|...` | One result: glucose (LOINC 2345-7) is 182 mg/dL, normal range 70-99, flagged `H` for high |
+
+The whole message says: *the lab reports that Marie Dupont's glucose is 182, above
+normal*. The same information as a FHIR R4 `Observation`, in one line instead of
+twenty-five of JSON.
+
+### And FHIR, in one paragraph
+
+[FHIR](https://hl7.org/fhir/) (Fast Healthcare Interoperability Resources) is HL7's
+modern standard: it breaks medical data down into small, reusable building blocks
+called **resources**, such as `Patient`, `Observation`, `Condition` or
+`MedicationRequest`, exchanged as JSON over a REST API. A patient's record is a graph
+of resources referencing each other. Where HL7v2 is the wire format of the hospital's
+event feeds, FHIR is the API of its records.
+
 ## The story
 
 A hospital ward runs an assistant for its clinicians. The knowledge is the patients'
-own data, flowing in real time. All data is synthetic.
+own data. All data is synthetic.
 
-| Source | Protocol / format | Content | Who else can read it |
+Hospitals run both worlds side by side, and will for years: the event feeds (labs,
+admissions) speak HL7v2, the records and APIs speak FHIR. This example deliberately
+keeps both, as they are. Converting the v2 feed to FHIR is possible (the official
+V2-to-FHIR mapping, or flows like the
+[`fhir/` example](https://github.com/apache/camel-quarkus-examples/tree/main/fhir),
+which stores HL7v2 patients into a HAPI server), but that serves a different concern:
+keeping the system of record up to date. Here the record already exists; we build
+knowledge from both sources without converting either.
+
+Two ingestion routes, two kinds of documents, one vector store:
+
+| Route | Source | Document produced | Pace |
 |---|---|---|---|
-| Hospital feed | HL7v2 over MLLP | Admissions (ADT), lab results (ORU), continuous | Nobody. Camel parses it natively (HAPI). |
-| Patient records | FHIR R4 (HAPI server) | Patients, conditions, medications | Camel's `fhir` component, typed queries |
+| `ward` | HL7v2 over MLLP, continuous | **Event summary**: "Glucose: 182 mg/dL, flagged HIGH", id `PAT-123@MSG0001` | Real time, as the feed beats |
+| `records` | FHIR R4, polled with the `fhir` component | **Record summary**: active conditions, medications, allergies of a patient, id `PAT-123@<lastUpdated>` | Slow, when a record changes |
 
-The `camel-quarkus-examples` repo already has the first half of this story: its
-[`fhir/` example](https://github.com/apache/camel-quarkus-examples/tree/main/fhir)
-converts HL7v2 patients to FHIR R4 and stores them in a HAPI server. This example
-picks up exactly there: make that data answerable in natural language.
+The two formats are never converted into each other. They converge on the same
+target: plain text a model can embed. Retrieval mixes both document kinds naturally:
+"which patients had abnormal labs?" matches events, "any patients on anticoagulants?"
+matches records, and every answer cites the documents it stands on.
 
 ## Ingestion: Camel builds the documents
 
-One route, triggered by the hospital feed:
+**The `ward` route (events).** An HL7v2 message arrives on the MLLP port, the `hl7`
+data format parses it, and a **mapping** renders one clinical summary per event: the
+parsed message is encoded to HL7's standard XML form, and an XSLT shapes the document.
+The mapping is configuration, not code: what the knowledge base says about an event is
+adjusted in the stylesheet, without touching Java. The document id is version-aware
+(`PAT-123@MSG0001`): the ingest engine is first-write-wins, every new event is a new
+document. The vector store follows the ward in real time.
 
-1. An HL7v2 message arrives on the MLLP port. The `hl7` data format parses it.
-2. The route **enriches**: it fetches the patient's FHIR record (conditions,
-   medications, allergies) with the `fhir` component.
-3. An **aggregation** step renders one readable clinical summary per patient:
-   who they are, why they are here, what the labs say, what they take.
-4. The summary goes to the `langchain4j-ingest` pipeline with a version-aware
-   document id (`PAT-123@<event-seq>`): the engine is first-write-wins, every new
-   event produces a new version. The vector store follows the ward in real time.
+**The `records` route (context).** The `fhir` consumer polls the FHIR server for
+new and updated resources and renders one record summary per patient: who they are,
+active conditions, current medications, allergies. When a record changes, its summary
+re-ingests under a new `@<lastUpdated>` id.
 
-No file is read anywhere in the flow.
+No file is read anywhere in the flow, and nothing is converted between HL7 and FHIR.
+
+### From the wire to the vector store
+
+What one event looks like at each end. In: a single MLLP frame, HL7v2 ER7.
+
+```
+MSH|^~\&|LAB|ACME^HOSP|EHR|ACME|20261002093000||ORU^R01|MSG0001|P|2.4
+PID|1||PAT-123||Dupont^Marie||19560312|F
+OBR|1|||24331-1^Metabolic panel^LN
+OBX|1|NM|2345-7^Glucose^LN||182|mg/dL|70-99|H|||F
+OBX|2|NM|2823-3^Potassium^LN||4.1|mmol/L|3.5-5.2||||F
+```
+
+Out: the document the embedding model actually sees, rendered by the mapping.
+
+```
+Patient Marie Dupont (id PAT-123, born 1956-03-12, sex F).
+Event ORU^R01 at 20261002093000.
+Lab results:
+- Glucose: 182 mg/dL (reference 70-99), flagged HIGH
+- Potassium: 4.1 mmol/L (reference 3.5-5.2)
+```
+
+Codes become words on the way through: `H` reads "flagged HIGH", `HH` reads
+"flagged CRITICALLY HIGH", the reference range sits next to the value. That is the
+point of the mapping: a question like "which patients had abnormal labs?" can only
+match text that says abnormal things in plain language.
+
+The `records` route does the same for the other world. In: FHIR R4 resources, as the
+server returns them (excerpt; one `Condition` and one `MedicationRequest` out of a
+patient's record):
+
+```json
+{ "resourceType": "Condition",
+  "clinicalStatus": { "coding": [{ "code": "active" }] },
+  "code": { "coding": [{ "system": "http://snomed.info/sct",
+                         "code": "44054006", "display": "Type 2 diabetes mellitus" }] },
+  "subject": { "reference": "Patient/PAT-123" },
+  "recordedDate": "2019-03-18" }
+
+{ "resourceType": "MedicationRequest", "status": "active",
+  "medicationCodeableConcept": { "coding": [{ "system": "http://www.nlm.nih.gov/research/umls/rxnorm",
+                                              "code": "860975", "display": "Metformin 500 MG" }] },
+  "subject": { "reference": "Patient/PAT-123" } }
+```
+
+Out: one record summary per patient, the same plain-language shape as the events.
+
+```
+Patient Marie Dupont (id PAT-123, born 1956-03-12, sex F).
+Active conditions: type 2 diabetes mellitus (2019), hypertension (2021).
+Current medications: metformin 500mg, lisinopril 10mg.
+Allergies: penicillin.
+```
+
+Same lesson on both routes: coded structure in (`44054006`, `860975`), words out
+("type 2 diabetes", "metformin"). The display labels the standards carry are what
+makes the documents readable.
+
+What Qdrant stores per document: the text split into overlapping segments (800
+characters, 80 overlap), each with its 384-dimension MiniLM vector and its metadata
+(`camel_ingest_pipeline`, `camel_ingest_document_id`). The id tells both the patient
+and what the document stands on, event or record state.
 
 **Cross-cutting, the parts a hospital would actually require:**
 
@@ -88,8 +188,8 @@ cannot do: cross-document, temporal and similarity questions.
 - "Have we seen similar presentations recently?"
 
 A single-patient factual lookup ("is this patient on anticoagulants?") stays a FHIR
-query: deterministic, no model in the path. That is exactly why the enrichment step
-exists, and the example says so explicitly.
+query: deterministic, no model in the path. The record summaries make the assistant
+aware of that context, they do not replace the system of record.
 
 ## Flow
 
@@ -106,12 +206,14 @@ pre-generated `synthea-sample-data` zips carry no license file, so we do not cop
   generates 20 patients with fixed seeds and a fixed reference date
   (`jbang GenerateDataset.java`), as slim FHIR R4 bundles (~2 MB) committed with the
   example. Same version, same options, same patients: reproducible and extendable.
-- At startup, the bundles seed the HAPI FHIR server.
+- At startup, the bundles seed the HAPI FHIR server: the `records` route then has a
+  live system to poll.
 - The HL7v2 messages are **not** taken from the internet: sample messages found online
-  reference patients that do not exist in our FHIR server, and the whole point of the
-  route is the enrichment step. The feeder builds valid ADT and ORU messages with HAPI
-  (the library the `hl7` component already uses), using the ids of the seeded Synthea™
-  patients. Same ids on both sides, plausible lab values, a coherent flow.
+  reference patients that do not exist in our FHIR server, and the knowledge base
+  should tell one coherent story per patient across both routes. The feeder builds
+  valid ADT and ORU messages with HAPI (the library the `hl7` component already uses),
+  using the ids of the seeded Synthea™ patients. Same ids on both sides, plausible lab
+  values, a coherent flow.
 
 ## Running it: real systems, no stand-ins
 
@@ -142,9 +244,10 @@ Same names as the intro example, so readers can follow the progression:
 
 ## Phasing
 
-1. Scaffold, Qdrant, assistant, the MLLP route with HL7 parsing and a first
-   plain-text summary, with tests.
-2. FHIR enrichment: the summary becomes a real clinical dossier.
+1. ~~Scaffold, Qdrant, assistant, the MLLP route with HL7 parsing, the XSLT summary
+   mapping, with route tests and an end-to-end test.~~ **Done.**
+2. The `records` route: HAPI FHIR container, Synthea™ seeding at startup, the `fhir`
+   polling consumer, record summaries.
 3. Kafka: dead letter topic, idempotent repository, metadata filtering, citations,
    output guardrails.
 4. The feeder, README.adoc with the flow diagram, `examples.json` entry, native
