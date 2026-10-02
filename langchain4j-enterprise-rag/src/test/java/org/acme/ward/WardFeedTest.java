@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @QuarkusTest
 @WithTestResource(OllamaTestResource.class)
+@WithTestResource(FreeFeedPortTestResource.class)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class WardFeedTest {
 

@@ -148,9 +148,18 @@ Same lesson on both routes: coded structure in (`44054006`, `860975`), words out
 makes the documents readable.
 
 What Qdrant stores per document: the text split into overlapping segments (800
-characters, 80 overlap), each with its 384-dimension MiniLM vector and its metadata
-(`camel_ingest_pipeline`, `camel_ingest_document_id`). The id tells both the patient
-and what the document stands on, event or record state.
+characters, 80 overlap), each with its 384-dimension MiniLM vector and this payload
+(a real one, straight from the Qdrant console):
+
+```json
+{ "index": "0",
+  "text_segment": "Patient Paul Martin (id PAT-456, born 1970-11-20, sex M).\nEvent ADT^A01 at 20261003080000.\nAdmitted to CARD1, reason: Chest pain.",
+  "camel_ingest_pipeline": "ward",
+  "camel_ingest_document_id": "PAT-456@DEMO1" }
+```
+
+`camel_ingest_pipeline` says which route produced the document, `camel_ingest_document_id`
+is the version-aware citation, `index` numbers the segments of a split document.
 
 **Cross-cutting, the parts a hospital would actually require:**
 

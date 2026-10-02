@@ -1,5 +1,6 @@
 package org.acme.ward;
 
+import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import org.apache.camel.builder.AdviceWith;
 import org.apache.camel.component.mock.MockEndpoint;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
  * in milliseconds, without a socket, an embedding model or a vector store.
  */
 @QuarkusTest
+@WithTestResource(FreeFeedPortTestResource.class)
 public class WardRouteTest extends CamelQuarkusTestSupport {
 
     @BeforeEach

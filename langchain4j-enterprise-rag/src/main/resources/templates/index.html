@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patient Timeline</title>
+<style>
+  :root { --violet: #5B2C8E; --cyan: #00D4FF; --ink: #333; --muted: #777; --bg: #F5F5F5; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  header { background: var(--violet); color: #fff; padding: 18px 28px; }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 4px 0 0; color: #D9C9F2; font-size: 14px; }
+  main { max-width: 1200px; margin: 24px auto; padding: 0 16px;
+         display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel { background: #fff; border: 2px solid var(--violet); border-radius: 12px; padding: 18px; }
+  .panel.cyan { border-color: var(--cyan); }
+  .panel h2 { margin: 0 0 12px; font-size: 16px; color: var(--violet); letter-spacing: .5px; }
+  .presets button { background: #EDE7F6; border: 1px solid var(--violet); color: var(--violet);
+         border-radius: 16px; padding: 5px 12px; margin: 0 6px 10px 0; cursor: pointer; font-size: 13px; }
+  textarea { width: 100%; height: 150px; background: #2D2235; color: var(--cyan); border: 0;
+         border-radius: 8px; padding: 12px; font: 12.5px Menlo, Consolas, monospace; white-space: pre; }
+  .send { background: var(--violet); color: #fff; border: 0; border-radius: 8px;
+         padding: 10px 22px; margin-top: 10px; font-size: 14px; font-weight: bold; cursor: pointer; }
+  .send:disabled { opacity: .5; }
+  #ack { margin-top: 10px; font-size: 13.5px; }
+  #ack .ok { color: #2E7D32; font-weight: bold; }
+  #ack .ko { color: #C62828; font-weight: bold; }
+  #live { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; }
+  .doc { border: 1px solid #E0D8EE; border-left: 4px solid var(--cyan); border-radius: 8px; padding: 10px 12px; }
+  .doc .id { font: 12px Menlo, Consolas, monospace; color: var(--violet); font-weight: bold; }
+  .doc pre { margin: 6px 0 0; font: 12.5px Menlo, Consolas, monospace; white-space: pre-wrap; color: var(--ink); }
+  .chat { grid-column: 1 / -1; }
+  #log { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .q, .a { border-radius: 10px; padding: 9px 13px; max-width: 75%; font-size: 14px; }
+  .q { background: #EDE7F6; color: var(--violet); align-self: flex-end; font-weight: bold; }
+  .a { background: #fff; border: 1px solid #E0D8EE; align-self: flex-start; white-space: pre-wrap; }
+  .a.wait { color: var(--muted); font-style: italic; }
+  .askrow { display: flex; gap: 10px; }
+  .askrow input { flex: 1; border: 2px solid var(--violet); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+  .hint { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Enterprise RAG &middot; Patient Timeline</h1>
+  <p>Camel builds the documents. The ward asks the questions.</p>
+</header>
+<main>
+  <section class="panel">
+    <h2>THE FEED &mdash; send an HL7v2 event</h2>
+    <div class="presets">
+      <button onclick="preset('adt')">Admission (ADT)</button>
+      <button onclick="preset('abnormal')">Abnormal lab (ORU)</button>
+      <button onclick="preset('normal')">Normal lab (ORU)</button>
+    </div>
+    <textarea id="hl7" spellcheck="false"></textarea>
+    <button class="send" id="send" onclick="send()">Send to the feed</button>
+    <div id="ack"></div>
+    <p class="hint">Edit the message before sending: change a value, a flag, a name.
+       It goes through the real MLLP port; the acknowledgment returns once the event is embedded.</p>
+  </section>
+
+  <section class="panel">
+    <h2>LIVE &mdash; what the knowledge base holds</h2>
+    <div id="live"><p class="hint">Waiting for events&hellip;</p></div>
+  </section>
+
+  <section class="panel cyan chat">
+    <h2>ASK THE WARD</h2>
+    <div id="log"></div>
+    <div class="askrow">
+      <input id="q" placeholder="Which patients had abnormal labs today?"
+             onkeydown="if (event.key === 'Enter') ask()">
+      <button class="send" onclick="ask()">Ask</button>
+    </div>
+    <p class="hint">Grounded answers only: the AI service cites the documents it stands on, or refuses.</p>
+  </section>
+</main>
+
+<script>
+{|
+const PRESETS = {
+  adt: ["MSH|^~\\&|ADT|ACME^HOSP|EHR|ACME|20261003080000||ADT^A01|DEMO1|P|2.4",
+        "EVN|A01|20261003080000",
+        "PID|1||PAT-456||Martin^Paul||19701120|M",
+        "PV1|1|I|CARD1",
+        "PV2|||^Chest pain"].join("\n"),
+  abnormal: ["MSH|^~\\&|LAB|ACME^HOSP|EHR|ACME|20261003093000||ORU^R01|DEMO2|P|2.4",
+        "PID|1||PAT-123||Dupont^Marie||19560312|F",
+        "OBR|1|||24331-1^Metabolic panel^LN",
+        "OBX|1|NM|2345-7^Glucose^LN||182|mg/dL|70-99|H|||F",
+        "OBX|2|NM|2823-3^Potassium^LN||6.9|mmol/L|3.5-5.2|HH|||F"].join("\n"),
+  normal: ["MSH|^~\\&|LAB|ACME^HOSP|EHR|ACME|20261003101500||ORU^R01|DEMO3|P|2.4",
+        "PID|1||PAT-789||Bernard^Sophie||19881205|F",
+        "OBR|1|||24331-1^Metabolic panel^LN",
+        "OBX|1|NM|2345-7^Glucose^LN||88|mg/dL|70-99||||F"].join("\n")
+};
+
+function preset(name) { document.getElementById("hl7").value = PRESETS[name]; }
+preset("abnormal");
+
+async function send() {
+  const btn = document.getElementById("send");
+  const ack = document.getElementById("ack");
+  btn.disabled = true;
+  ack.innerHTML = "sending…";
+  try {
+    const res = await fetch("/feed", { method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: document.getElementById("hl7").value });
+    const json = await res.json();
+    ack.innerHTML = json.ackCode === "AA"
+      ? '<span class="ok">ACK AA</span> · accepted and embedded'
+      : '<span class="ko">ACK ' + json.ackCode + '</span> · the feed rejected it';
+  } catch (e) {
+    ack.innerHTML = '<span class="ko">' + e + "</span>";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host;
+const live = new WebSocket(wsUrl + "/ws/ward");
+live.onmessage = (event) => {
+  const doc = JSON.parse(event.data);
+  const panel = document.getElementById("live");
+  const hint = panel.querySelector(".hint");
+  if (hint) hint.remove();
+  const card = document.createElement("div");
+  card.className = "doc";
+  const id = document.createElement("div");
+  id.className = "id";
+  id.textContent = doc.documentId + " · " + doc.outcome;
+  const text = document.createElement("pre");
+  text.textContent = doc.summary;
+  card.append(id, text);
+  panel.prepend(card);
+};
+
+const chat = new WebSocket(wsUrl + "/ws/chat");
+let pending = null;
+chat.onmessage = (event) => {
+  if (pending) { pending.classList.remove("wait"); pending.textContent = event.data; pending = null; }
+};
+
+function ask() {
+  const input = document.getElementById("q");
+  const question = input.value.trim() || input.placeholder;
+  input.value = "";
+  const log = document.getElementById("log");
+  const q = document.createElement("div");
+  q.className = "q";
+  q.textContent = question;
+  pending = document.createElement("div");
+  pending.className = "a wait";
+  pending.textContent = "thinking…";
+  log.append(q, pending);
+  chat.send(question);
+}
+|}
+</script>
+</body>
+</html>
