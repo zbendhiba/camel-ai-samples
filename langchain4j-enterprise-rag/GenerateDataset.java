@@ -46,9 +46,7 @@ public class GenerateDataset {
                 "-p", "20", "-a", "25-70",
                 "--exporter.baseDirectory=" + WORK,
                 "--exporter.years_of_history=2",
-                "--exporter.fhir.included_resources=Patient,Encounter,Condition,MedicationRequest,AllergyIntolerance,Immunization",
-                "--exporter.hospital.fhir.export=false",
-                "--exporter.practitioner.fhir.export=false");
+                "--exporter.fhir.included_resources=Patient,Encounter,Condition,MedicationRequest,AllergyIntolerance,Immunization");
 
         // Keep only living patients: a deceased record makes no sense on a live ward feed.
         deleteRecursively(OUT);
@@ -56,9 +54,25 @@ public class GenerateDataset {
         long kept;
         try (Stream<Path> bundles = Files.list(WORK.resolve("fhir"))) {
             kept = bundles.filter(p -> p.toString().endsWith(".json"))
+                    .filter(p -> !p.getFileName().toString().contains("Information"))
                     .filter(GenerateDataset::isAlive)
                     .peek(p -> copyTo(p, OUT))
                     .count();
+        }
+        // the patient bundles reference practitioners and organizations by conditional
+        // URL, so the hospital and practitioner bundles must exist on the server first;
+        // they are copied under fixed names and listed first in the index
+        copyInfoBundle("hospitalInformation", "hospitalInformation.json");
+        copyInfoBundle("practitionerInformation", "practitionerInformation.json");
+
+        // the classpath cannot list a directory, so the seeder reads this index
+        try (Stream<Path> bundles = Files.list(OUT)) {
+            Files.writeString(OUT.resolve("index.txt"), bundles
+                    .map(p -> p.getFileName().toString())
+                    .filter(n -> n.endsWith(".json") && !n.contains("Information"))
+                    .sorted()
+                    .reduce("hospitalInformation.json\npractitionerInformation.json\n",
+                            (a, b) -> a + b + "\n"));
         }
         System.out.println("Dataset: " + kept + " living patients in " + OUT);
     }
@@ -88,6 +102,15 @@ public class GenerateDataset {
                 Files.deleteIfExists(JAR);
                 throw new IOException("Download failed with HTTP " + response.statusCode());
             }
+        }
+    }
+
+
+    static void copyInfoBundle(String prefix, String target) throws IOException {
+        try (Stream<Path> files = Files.list(WORK.resolve("fhir"))) {
+            Path source = files.filter(p -> p.getFileName().toString().startsWith(prefix))
+                    .findFirst().orElseThrow();
+            Files.copy(source, OUT.resolve(target), StandardCopyOption.REPLACE_EXISTING);
         }
     }
 

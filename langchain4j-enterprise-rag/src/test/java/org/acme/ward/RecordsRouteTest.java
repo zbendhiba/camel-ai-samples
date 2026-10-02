@@ -1,0 +1,56 @@
+package org.acme.ward;
+
+import io.quarkus.test.common.WithTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import org.apache.camel.builder.AdviceWith;
+import org.apache.camel.component.mock.MockEndpoint;
+import org.apache.camel.quarkus.test.CamelQuarkusTestSupport;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.DateType;
+import org.hl7.fhir.r4.model.Enumerations;
+import org.hl7.fhir.r4.model.Patient;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Tests the EXISTING patient-records route in isolation: AdviceWith swaps the polling
+ * fhir consumer for a direct endpoint and the ingest pipeline for a mock; the bundle
+ * handling, the record rendering and the document id run for real. The renderer's
+ * lookups go to the Dev Service FHIR server, which knows nothing about this patient,
+ * so the record reads "none on record" everywhere.
+ */
+@QuarkusTest
+@WithTestResource(FreeFeedPortTestResource.class)
+public class RecordsRouteTest extends CamelQuarkusTestSupport {
+
+    @BeforeEach
+    void advisePatientRecords() throws Exception {
+        AdviceWith.adviceWith(this.context, "patient-records", route -> {
+            route.replaceFromWith("direct:records-test");
+            route.weaveByToUri("direct:records-ingest").replace().to("mock:records-ingested");
+        });
+    }
+
+    @Test
+    void aPatientBecomesARecordSummary() throws Exception {
+        MockEndpoint ingested = getMockEndpoint("mock:records-ingested");
+        ingested.expectedMessageCount(1);
+        ingested.message(0).header(WardRoutes.DOCUMENT_ID_HEADER).startsWith("TEST-1@");
+        ingested.message(0).body(String.class)
+                .contains("Patient Marie Dupont (id TEST-1, born 1956-03-12, sex Female).");
+        ingested.message(0).body(String.class).contains("Active conditions: none on record.");
+        ingested.message(0).body(String.class).contains("Allergies: none on record.");
+
+        Patient patient = new Patient();
+        patient.setId("Patient/TEST-1");
+        patient.addName().setFamily("Dupont").addGiven("Marie");
+        patient.setBirthDateElement(new DateType("1956-03-12"));
+        patient.setGender(Enumerations.AdministrativeGender.FEMALE);
+
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(patient);
+
+        template.sendBody("direct:records-test", bundle);
+        ingested.assertIsSatisfied(30000);
+    }
+}

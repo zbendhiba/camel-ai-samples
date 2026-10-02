@@ -228,35 +228,66 @@ pre-generated `synthea-sample-data` zips carry no license file, so we do not cop
 
 The example runs against the real thing:
 
-- **Ollama** on the developer's machine, same as the intro example.
-- **HAPI FHIR server** as a container, the same image the `fhir/` example uses.
-- **Qdrant and Kafka** started by Dev Services.
-- **A feeder** sends the generated HL7v2 messages to the MLLP port (a small script or
-  `camel jbang` route), so the demo has a live pulse: start the app, watch summaries
-  appear, ask questions about patients that did not exist a minute ago.
+- **Ollama** on the developer's machine, same as the intro example
+  (`ollama pull gemma4:e4b`).
+- **HAPI FHIR server** as a [Compose Dev Service](https://quarkus.io/guides/compose-dev-services)
+  (`compose-devservices.yml`): Quarkus starts the container in dev and test mode,
+  the same image the `fhir/` example uses. At startup the `FhirSeeder` loads the
+  Synthea™ bundles, so the `records` route has a live, populated system to poll.
+  Seeding is idempotent: a server that already holds patients is left alone. The
+  hospital and practitioner bundles load first; the patient bundles reference them
+  by conditional URL, so the order matters.
+- **Qdrant** started by its Dev Service, collection pre-created. **Kafka** joins in
+  phase 3.
+- **A feeder** sends the generated HL7v2 messages to the MLLP port (phase 4), so the
+  demo has a live pulse without typing. Until then, the demo page does the job.
+
+Two Compose Dev Services tricks worth noting:
+
+- The HAPI image is distroless: no shell, no curl, so no compose `healthcheck` can
+  run inside it. The `io.quarkus.devservices.compose.wait_for.logs` label makes
+  Quarkus watch the container **logs** instead, and hold the application start until
+  HAPI reports ready. No polling noise, no hand-rolled wait loop around the routes.
+- `quarkus.compose.devservices.reuse-project-for-tests=true` lets the tests reuse
+  the FHIR server already started by dev mode. Without it, the tests start an
+  isolated copy of the compose project, which cannot bind the fixed port while dev
+  mode runs.
 
 WireMock appears **only** in the JVM and native tests, standing in for Ollama so CI
 runs without a GPU (the `OllamaTestResource` pattern from the intro example). The
-MLLP feed is plain TCP and is fed directly from the tests; FHIR runs as a
-testcontainer there too.
+MLLP feed is plain TCP and is fed directly from the tests; FHIR is the same Compose
+Dev Service there too.
+
+### The demo page
+
+`GET /` serves one page (Qute template, WebSockets Next underneath):
+
+- **Live**: every document as it is ingested, record summaries and event summaries
+  alike. On a fresh start, the 20 patient records land within one poll.
+- **Feed**: paste an HL7v2 message. `POST /feed` sends it through the real MLLP wire
+  with Camel's own `mllp` producer, and the acknowledgment comes back once the
+  ingestion completed. No shortcut into the route.
+- **Chat**: the ward AI service, grounded answers only.
 
 ## Endpoints
 
-Same names as the intro example, so readers can follow the progression:
-
 | Endpoint | Shows |
 |---|---|
-| `GET /search?q=` | Raw retrieval: closest segments, score, patient, document id |
-| `GET /search?q=&patient=` | The same, filtered by patient |
-| `GET /chat/preview?q=` | The augmented prompt, no LLM call |
-| `GET /chat?q=` | The grounded answer, with citations |
+| `GET /` | The demo page: live documents, HL7v2 feed box, chat |
+| `POST /feed` | Injects an HL7v2 message through the real MLLP wire, returns the ACK |
+| `GET /search?q=` | Raw retrieval: the closest segments, score and source document id |
+| `/ws/ward`, `/ws/chat` | The WebSockets behind the page: documents as they land, the grounded chat |
+
+The patient filter on `/search` and a `GET /chat/preview?q=` prompt preview come with
+phase 3 (metadata filtering and citations).
 
 ## Phasing
 
 1. ~~Scaffold, Qdrant, assistant, the MLLP route with HL7 parsing, the XSLT summary
    mapping, with route tests and an end-to-end test.~~ **Done.**
-2. The `records` route: HAPI FHIR container, Synthea™ seeding at startup, the `fhir`
-   polling consumer, record summaries.
+2. ~~The `records` route: HAPI FHIR container, Synthea™ seeding at startup, the `fhir`
+   polling consumer, record summaries.~~ **Done**, plus the live demo page (Qute,
+   WebSockets Next, the real MLLP wire).
 3. Kafka: dead letter topic, idempotent repository, metadata filtering, citations,
    output guardrails.
 4. The feeder, README.adoc with the flow diagram, `examples.json` entry, native

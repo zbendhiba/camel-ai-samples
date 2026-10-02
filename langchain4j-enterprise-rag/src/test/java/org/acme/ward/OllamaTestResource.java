@@ -53,7 +53,7 @@ public class OllamaTestResource implements QuarkusTestResourceLifecycleManager {
     private static String answer(String content) {
         return """
                 {
-                  "model": "llama3.2",
+                  "model": "gemma4:e4b",
                   "created_at": "2026-01-01T00:00:00Z",
                   "message": { "role": "assistant", "content": "%s" },
                   "done": true,

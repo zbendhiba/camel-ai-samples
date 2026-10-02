@@ -63,9 +63,10 @@ class WardFeedTest {
     @Order(2)
     void chatAnswersGroundedInTheFeed() {
         // the WireMock "model" only knows this answer when the retrieved summary reached
-        // the prompt, so a correct answer proves the retrieval step worked
+        // the prompt, so a correct answer proves the retrieval step worked; the question
+        // names the patient so the event summary outranks the seeded record summaries
         given()
-                .queryParam("q", "Which patients had abnormal labs today?")
+                .queryParam("q", "What was the glucose lab result of Marie Dupont?")
                 .get("/chat")
                 .then()
                 .statusCode(200)
@@ -76,7 +77,7 @@ class WardFeedTest {
     @Order(3)
     void previewShowsTheAugmentedPrompt() {
         given()
-                .queryParam("q", "Which patients had abnormal labs today?")
+                .queryParam("q", "What was the glucose lab result of Marie Dupont?")
                 .get("/chat/preview")
                 .then()
                 .statusCode(200)

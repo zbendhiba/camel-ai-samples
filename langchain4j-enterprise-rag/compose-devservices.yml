@@ -1,0 +1,17 @@
+# Compose Dev Services: Quarkus starts this in dev and test mode, like the Qdrant and
+# Kafka Dev Services. The HAPI FHIR server plays the hospital's patient record system;
+# the seeder fills it with the Synthea(TM) patients at startup.
+name: ward
+services:
+  fhir:
+    image: docker.io/hapiproject/hapi:v8.2.0-2
+    environment:
+      hapi.fhir.fhir_version: R4
+      hapi.fhir.allow_multiple_delete: "true"
+    labels:
+      # The image is distroless (no shell, no curl), so a compose healthcheck cannot
+      # run inside it. Quarkus watches the container logs instead and holds the app
+      # start until the HAPI starter reports ready.
+      io.quarkus.devservices.compose.wait_for.logs: .*Started Application in.*
+    ports:
+      - "8087:8080"
