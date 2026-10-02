@@ -26,7 +26,7 @@ public class ChatResource {
     @GET
     @Produces(MediaType.TEXT_PLAIN)
     public String chat(@QueryParam("q") String question) {
-        return aiService.answer(question);
+        return aiService.answer(question, WardAiService.now());
     }
 
     /** The prompt the AI service would send: the question plus the retrieved context. No LLM is called. */

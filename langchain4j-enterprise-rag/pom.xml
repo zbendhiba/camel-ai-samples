@@ -91,6 +91,13 @@
             <groupId>org.apache.camel.quarkus</groupId>
             <artifactId>camel-quarkus-bean</artifactId>
         </dependency>
+        <!-- the one-shot bootstrap route fires from a timer. Beware: camel-quarkus-junit
+             brings camel-timer in test scope, so a missing extension here breaks dev and
+             prod while the tests stay green -->
+        <dependency>
+            <groupId>org.apache.camel.quarkus</groupId>
+            <artifactId>camel-quarkus-timer</artifactId>
+        </dependency>
         <!-- the summary mapping is an XSLT over the standard HL7 XML encoding -->
         <dependency>
             <groupId>org.apache.camel.quarkus</groupId>

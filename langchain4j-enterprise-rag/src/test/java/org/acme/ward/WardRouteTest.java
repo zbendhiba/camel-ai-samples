@@ -34,7 +34,7 @@ public class WardRouteTest extends CamelQuarkusTestSupport {
         ingested.expectedHeaderReceived(WardRoutes.DOCUMENT_ID_HEADER, "PAT-123@MSG0001");
         ingested.expectedBodiesReceived("""
                 Patient Marie Dupont (id PAT-123, born 1956-03-12, sex F).
-                Event ORU^R01 at 20261002093000.
+                Event ORU^R01 on 2026-10-02 at 09:30.
                 Lab results:
                 - Glucose: 182 mg/dL (reference 70-99), flagged HIGH
                 - Potassium: 4.1 mmol/L (reference 3.5-5.2)
@@ -57,7 +57,7 @@ public class WardRouteTest extends CamelQuarkusTestSupport {
         ingested.expectedHeaderReceived(WardRoutes.DOCUMENT_ID_HEADER, "PAT-456@MSG0002");
         ingested.expectedBodiesReceived("""
                 Patient Paul Martin (id PAT-456, born 1970-11-20, sex M).
-                Event ADT^A01 at 20261002080000.
+                Event ADT^A01 on 2026-10-02 at 08:00.
                 Admitted to CARD1, reason: Chest pain.
                 """);
 

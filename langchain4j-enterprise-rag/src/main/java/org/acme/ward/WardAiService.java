@@ -1,5 +1,8 @@
 package org.acme.ward;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
 import io.quarkiverse.langchain4j.RegisterAiService;
@@ -15,9 +18,19 @@ import jakarta.enterprise.context.ApplicationScoped;
 public interface WardAiService {
 
     @SystemMessage("""
-            You assist the clinicians of a hospital ward.
+            You assist the clinicians of a hospital ward. Now is {now}.
             Use ONLY the clinical summaries provided together with the question.
-            If they do not contain the answer, reply: I don't have that information.
+            Events carry their date and time: use them to answer time questions
+            such as "today", "this morning" or "overnight".
+            If the summaries do not contain the answer, reply: I don't have that information.
             Name the patients and events your answer is based on. Be concise.""")
-    String answer(@UserMessage String question);
+    String answer(@UserMessage String question, String now);
+
+    /**
+     * The model has no clock: "today" and "overnight" only mean something when the
+     * prompt says what time it is. Callers pass this as the {@code now} argument.
+     */
+    static String now() {
+        return LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES).toString().replace('T', ' ');
+    }
 }

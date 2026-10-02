@@ -11,19 +11,18 @@ import java.time.Instant;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.apache.camel.ProducerTemplate;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 /**
- * Seeds the FHIR server with the Synthea(TM) patients at startup, so the records route
- * has a live system to poll. The bundles are FHIR transaction bundles: posting one makes
- * the server create the resources and resolve the references. Seeding is idempotent the
- * simple way: a server that already has patients is left alone.
+ * Seeds the FHIR server with the Synthea(TM) patients, called by the one-shot bootstrap
+ * route before the initial load, so the knowledge base is built from a populated system.
+ * The bundles are FHIR transaction bundles: posting one makes the server create the
+ * resources and resolve the references. Seeding is idempotent the simple way: a server
+ * that already has patients is left alone.
  */
 @ApplicationScoped
 public class FhirSeeder {
@@ -43,7 +42,7 @@ public class FhirSeeder {
     @Inject
     ProducerTemplate producer;
 
-    void onStart(@Observes StartupEvent event) throws Exception {
+    public void seed() throws Exception {
         if (enabled) {
             waitForFhir();
             seedIfEmpty();

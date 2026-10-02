@@ -22,7 +22,9 @@ public class WardRetrievalAugmentor implements Supplier<RetrievalAugmentor> {
         retriever = EmbeddingStoreContentRetriever.builder()
                 .embeddingStore(store)
                 .embeddingModel(model)
-                .maxResults(5)
+                // cross-document questions need room: the answer often sits in one
+                // event summary plus the matching record summary
+                .maxResults(8)
                 .build();
     }
 

@@ -17,6 +17,6 @@ public class WardChatSocket {
 
     @OnTextMessage
     public String onQuestion(String question) {
-        return aiService.answer(question);
+        return aiService.answer(question, WardAiService.now());
     }
 }

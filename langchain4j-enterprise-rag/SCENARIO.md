@@ -65,7 +65,7 @@ Two ingestion routes, two kinds of documents, one vector store:
 | Route | Source | Document produced | Pace |
 |---|---|---|---|
 | `ward` | HL7v2 over MLLP, continuous | **Event summary**: "Glucose: 182 mg/dL, flagged HIGH", id `PAT-123@MSG0001` | Real time, as the feed beats |
-| `records` | FHIR R4, polled with the `fhir` component | **Record summary**: active conditions, medications, allergies of a patient, id `PAT-123@<lastUpdated>` | Slow, when a record changes |
+| `records` | FHIR R4, read with the `fhir` component | **Record summary**: active conditions, medications, allergies of a patient, id `PAT-123@<lastUpdated>` | Initial load, once; then change tracking (see below) |
 
 The two formats are never converted into each other. They converge on the same
 target: plain text a model can embed. Retrieval mixes both document kinds naturally:
@@ -82,10 +82,32 @@ adjusted in the stylesheet, without touching Java. The document id is version-aw
 (`PAT-123@MSG0001`): the ingest engine is first-write-wins, every new event is a new
 document. The vector store follows the ward in real time.
 
-**The `records` route (context).** The `fhir` consumer polls the FHIR server for
-new and updated resources and renders one record summary per patient: who they are,
-active conditions, current medications, allergies. When a record changes, its summary
-re-ingests under a new `@<lastUpdated>` id.
+**The `records` route (context).** The initial load. Once the server is seeded, one
+full scan (paged, like every FHIR search) renders one record summary per patient: who
+they are, active conditions, current medications, allergies. The example deliberately
+stops there; what follows in production is the next section.
+
+### Keeping the records in sync (production)
+
+Re-scanning a client's FHIR database on a schedule is not an option. In production the
+full scan runs **once**; staying in sync afterwards is change tracking, and Camel
+covers every variant of it:
+
+- **Poll `_history` with a persisted cutoff.** One request asks the server for
+  everything that changed since the last watermark; only the affected patients are
+  re-read and re-rendered. A quiet server costs one request per poll. The details that
+  matter: `_since` is inclusive (advance the watermark one tick past the newest
+  change), the feed is paged (`fhir://load-page/next` walks the pages), and the
+  watermark must survive restarts (a table, a topic, a file).
+- **FHIR Subscriptions.** The server pushes each change to a rest-hook endpoint: a
+  plain Camel HTTP route receives it, no polling at all. The push variant of the same
+  flow, when the server supports it.
+- **CDC on the record system's database.** When the FHIR API offers neither, Debezium
+  (`camel-debezium`) streams the database's own change log.
+
+Whichever the transport, the processing stays this example's pipeline: changed patient
+in, fresh summary out, same version-aware document id; the deduplication absorbs
+replays.
 
 No file is read anywhere in the flow, and nothing is converted between HL7 and FHIR.
 
@@ -232,8 +254,9 @@ The example runs against the real thing:
   (`ollama pull gemma4:e4b`).
 - **HAPI FHIR server** as a [Compose Dev Service](https://quarkus.io/guides/compose-dev-services)
   (`compose-devservices.yml`): Quarkus starts the container in dev and test mode,
-  the same image the `fhir/` example uses. At startup the `FhirSeeder` loads the
-  Synthea™ bundles, so the `records` route has a live, populated system to poll.
+  the same image the `fhir/` example uses. A one-shot bootstrap route
+  (`timer?repeatCount=1`) waits for the server, seeds it with the Synthea™ bundles,
+  then runs the `records` route's initial load.
   Seeding is idempotent: a server that already holds patients is left alone. The
   hospital and practitioner bundles load first; the patient bundles reference them
   by conditional URL, so the order matters.
@@ -263,7 +286,7 @@ Dev Service there too.
 `GET /` serves one page (Qute template, WebSockets Next underneath):
 
 - **Live**: every document as it is ingested, record summaries and event summaries
-  alike. On a fresh start, the 20 patient records land within one poll.
+  alike. On a fresh start, the 20 patient records land right after the seeding.
 - **Feed**: paste an HL7v2 message. `POST /feed` sends it through the real MLLP wire
   with Camel's own `mllp` producer, and the acknowledgment comes back once the
   ingestion completed. No shortcut into the route.

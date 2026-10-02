@@ -13,11 +13,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests the EXISTING patient-records route in isolation: AdviceWith swaps the polling
- * fhir consumer for a direct endpoint and the ingest pipeline for a mock; the bundle
- * handling, the record rendering and the document id run for real. The renderer's
- * lookups go to the Dev Service FHIR server, which knows nothing about this patient,
- * so the record reads "none on record" everywhere.
+ * Tests the EXISTING patient-records route in isolation: AdviceWith swaps the patient
+ * search for a canned result and the ingest pipeline for a mock; the page walking, the
+ * record rendering and the document id run for real. The renderer's lookups go to the
+ * Dev Service FHIR server, which knows nothing about this patient, so the record reads
+ * "none on record" everywhere.
  */
 @QuarkusTest
 @WithTestResource(FreeFeedPortTestResource.class)
@@ -25,8 +25,13 @@ public class RecordsRouteTest extends CamelQuarkusTestSupport {
 
     @BeforeEach
     void advisePatientRecords() throws Exception {
+        // the one-shot bootstrap runs in the background: take its trigger away, or a
+        // late bootstrap could send a second, real load through the advised route
+        AdviceWith.adviceWith(this.context, "ward-bootstrap", route ->
+                route.replaceFromWith("direct:bootstrap-off"));
         AdviceWith.adviceWith(this.context, "patient-records", route -> {
-            route.replaceFromWith("direct:records-test");
+            route.weaveByToUri("fhir://search*").replace()
+                    .process(e -> e.getMessage().setBody(searchResultWith()));
             route.weaveByToUri("direct:records-ingest").replace().to("mock:records-ingested");
         });
     }
@@ -41,16 +46,21 @@ public class RecordsRouteTest extends CamelQuarkusTestSupport {
         ingested.message(0).body(String.class).contains("Active conditions: none on record.");
         ingested.message(0).body(String.class).contains("Allergies: none on record.");
 
+        template.sendBody("direct:records-initial-load", null);
+        ingested.assertIsSatisfied(30000);
+    }
+
+    /** What the patient search would return: one page, one patient, no next link. */
+    static Bundle searchResultWith() {
         Patient patient = new Patient();
         patient.setId("Patient/TEST-1");
         patient.addName().setFamily("Dupont").addGiven("Marie");
         patient.setBirthDateElement(new DateType("1956-03-12"));
         patient.setGender(Enumerations.AdministrativeGender.FEMALE);
 
-        Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(patient);
-
-        template.sendBody("direct:records-test", bundle);
-        ingested.assertIsSatisfied(30000);
+        Bundle result = new Bundle();
+        result.setType(Bundle.BundleType.SEARCHSET);
+        result.addEntry().setResource(patient);
+        return result;
     }
 }

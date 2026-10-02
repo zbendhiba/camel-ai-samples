@@ -30,11 +30,18 @@
     <xsl:value-of select="normalize-space(//PID/PID.8)"/>
     <xsl:text>).&#10;</xsl:text>
 
-    <!-- Event ORU^R01 at 20261002093000. -->
+    <!-- Event ORU^R01 on 2026-10-02 at 09:30. The raw HL7 timestamp (20261002093000)
+         means nothing to an embedding model or an LLM; a readable date is what lets
+         "what happened today?" match. -->
+    <xsl:variable name="ts" select="normalize-space(//MSH/MSH.7/TS.1)"/>
     <xsl:text>Event </xsl:text>
     <xsl:value-of select="$event"/>
-    <xsl:text> at </xsl:text>
-    <xsl:value-of select="normalize-space(//MSH/MSH.7/TS.1)"/>
+    <xsl:text> on </xsl:text>
+    <xsl:value-of select="concat(substring($ts, 1, 4), '-', substring($ts, 5, 2), '-', substring($ts, 7, 2))"/>
+    <xsl:if test="string-length($ts) &gt;= 12">
+      <xsl:text> at </xsl:text>
+      <xsl:value-of select="concat(substring($ts, 9, 2), ':', substring($ts, 11, 2))"/>
+    </xsl:if>
     <xsl:text>.&#10;</xsl:text>
 
     <!-- Admitted to CARD1, reason: Chest pain. -->
