@@ -18,7 +18,7 @@ import org.hl7.fhir.r4.model.Patient;
  *
  * This example stops there, deliberately. In production the full scan runs once, and
  * staying in sync afterwards is change tracking, not re-scanning: see "Keeping the
- * records in sync" in SCENARIO.md for the Camel options (polling {@code _history}
+ * records in sync" in the README for the Camel options (polling {@code _history}
  * with a persisted cutoff, FHIR Subscriptions, or CDC on the record system's
  * database).
  */
