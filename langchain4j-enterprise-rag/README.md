@@ -226,7 +226,14 @@ work was.
   ranks the expected patient first on every demo question. At 384 dimensions, a
   single mention ("chronic congestive heart failure") drowns in a long condition
   list and the one patient who matters ranks mid-field.
-- Chat model: Ollama, as in the intro example.
+- Chat model: `gemma4:e4b`, served by Ollama. The pick is not arbitrary: it won a
+  hands-on benchmark of local models (Granite, Qwen, Gemma, Phi) on a real agentic
+  task on developer hardware, on accuracy and speed. The full story is on the
+  author's blog: [I Tested Local LLMs to Triage My Gmail](https://zinebbendhiba.com/posts/i-tested-local-llms-to-triage-my-gmail-here-s-what-worked/)
+  and [Structured Output Broke My Local Email Triage Agent](https://zinebbendhiba.com/posts/structured-output-broke-my-local-email-triage-agent-here-s-how-i-fixed-it/).
+  It holds up on this example's hard parts too: it refuses when the summaries do
+  not contain the answer, tells lab results apart from imaging findings, and uses
+  the event timestamps to answer "today" and "overnight" questions.
 - The ward AI service: `@RegisterAiService` with a `RetrievalAugmentor` supporting a
   metadata filter (one patient, one ward). An AI service, not an agent: one grounded
   question-answer flow, no tools, no multi-agent loop.
