@@ -90,6 +90,18 @@
         </xsl:if>
         <xsl:text>&#10;</xsl:text>
       </xsl:for-each>
+      <!-- One plain sentence naming the flagged results. "Abnormal labs" is what a
+           clinician asks for, and retrieval can only match words the text actually
+           contains: "flagged HIGH" alone does not say "abnormal". -->
+      <xsl:variable name="flagged" select="//OBX[normalize-space(OBX.8) != '' and normalize-space(OBX.8) != 'N']"/>
+      <xsl:if test="count($flagged) &gt; 0">
+        <xsl:text>This patient has abnormal lab results: </xsl:text>
+        <xsl:for-each select="$flagged">
+          <xsl:if test="position() &gt; 1"><xsl:text>, </xsl:text></xsl:if>
+          <xsl:value-of select="normalize-space(OBX.3/CE.2)"/>
+        </xsl:for-each>
+        <xsl:text>.&#10;</xsl:text>
+      </xsl:if>
     </xsl:if>
   </xsl:template>
 </xsl:stylesheet>

@@ -23,8 +23,11 @@ public class WardRetrievalAugmentor implements Supplier<RetrievalAugmentor> {
                 .embeddingStore(store)
                 .embeddingModel(model)
                 // cross-document questions need room: the answer often sits in one
-                // event summary plus the matching record summary
-                .maxResults(8)
+                // event summary plus the matching record summary. A small embedding
+                // model ranks a long record summary low even when it contains the exact
+                // term (one mention is diluted among fifteen conditions), so the window
+                // is generous; the model sorts out relevance from there.
+                .maxResults(16)
                 .build();
     }
 

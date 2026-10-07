@@ -81,24 +81,34 @@
 
 <script>
 {|
-const PRESETS = {
-  adt: ["MSH|^~\\&|ADT|ACME^HOSP|EHR|ACME|20261003080000||ADT^A01|DEMO1|P|2.4",
-        "EVN|A01|20261003080000",
-        "PID|1||PAT-456||Martin^Paul||19701120|M",
-        "PV1|1|I|CARD1",
-        "PV2|||^Chest pain"].join("\n"),
-  abnormal: ["MSH|^~\\&|LAB|ACME^HOSP|EHR|ACME|20261003093000||ORU^R01|DEMO2|P|2.4",
-        "PID|1||PAT-123||Dupont^Marie||19560312|F",
-        "OBR|1|||24331-1^Metabolic panel^LN",
-        "OBX|1|NM|2345-7^Glucose^LN||182|mg/dL|70-99|H|||F",
-        "OBX|2|NM|2823-3^Potassium^LN||6.9|mmol/L|3.5-5.2|HH|||F"].join("\n"),
-  normal: ["MSH|^~\\&|LAB|ACME^HOSP|EHR|ACME|20261003101500||ORU^R01|DEMO3|P|2.4",
-        "PID|1||PAT-789||Bernard^Sophie||19881205|F",
-        "OBR|1|||24331-1^Metabolic panel^LN",
-        "OBX|1|NM|2345-7^Glucose^LN||88|mg/dL|70-99||||F"].join("\n")
-};
+// Preset timestamps sit in the recent past of the viewer's clock, whatever
+// day or hour the demo runs: an event dated days ago, or in the future, is
+// not "today" to the assistant, and it says so.
+function ts(minutesAgo) {
+  const d = new Date(Date.now() - minutesAgo * 60000);
+  const p = n => String(n).padStart(2, "0");
+  return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + p(d.getHours()) + p(d.getMinutes()) + "00";
+}
+function buildPresets() {
+  return {
+    adt: ["MSH|^~\\&|ADT|ACME^HOSP|EHR|ACME|" + ts(180) + "||ADT^A01|DEMO1|P|2.4",
+          "EVN|A01|" + ts(180),
+          "PID|1||PAT-456||Martin^Paul||19701120|M",
+          "PV1|1|I|CARD1",
+          "PV2|||^Chest pain"].join("\n"),
+    abnormal: ["MSH|^~\\&|LAB|ACME^HOSP|EHR|ACME|" + ts(90) + "||ORU^R01|DEMO2|P|2.4",
+          "PID|1||PAT-123||Dupont^Marie||19560312|F",
+          "OBR|1|||24331-1^Metabolic panel^LN",
+          "OBX|1|NM|2345-7^Glucose^LN||182|mg/dL|70-99|H|||F",
+          "OBX|2|NM|2823-3^Potassium^LN||6.9|mmol/L|3.5-5.2|HH|||F"].join("\n"),
+    normal: ["MSH|^~\\&|LAB|ACME^HOSP|EHR|ACME|" + ts(45) + "||ORU^R01|DEMO3|P|2.4",
+          "PID|1||PAT-789||Bernard^Sophie||19881205|F",
+          "OBR|1|||24331-1^Metabolic panel^LN",
+          "OBX|1|NM|2345-7^Glucose^LN||88|mg/dL|70-99||||F"].join("\n")
+  };
+}
 
-function preset(name) { document.getElementById("hl7").value = PRESETS[name]; }
+function preset(name) { document.getElementById("hl7").value = buildPresets()[name]; }
 preset("abnormal");
 
 async function send() {

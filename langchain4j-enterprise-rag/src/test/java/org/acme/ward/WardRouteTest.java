@@ -38,6 +38,7 @@ public class WardRouteTest extends CamelQuarkusTestSupport {
                 Lab results:
                 - Glucose: 182 mg/dL (reference 70-99), flagged HIGH
                 - Potassium: 4.1 mmol/L (reference 3.5-5.2)
+                This patient has abnormal lab results: Glucose.
                 """);
 
         template.sendBody("direct:feed-test", String.join("\r",

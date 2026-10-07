@@ -12,8 +12,13 @@ import jakarta.enterprise.context.ApplicationScoped;
  * The ward AI service: one grounded question-answer flow, no tools, no agent loop.
  * Retrieval-augmented answers are for what a structured query cannot do: cross-document,
  * temporal and similarity questions. A single-patient factual lookup stays a FHIR query.
+ *
+ * No chat memory, and not only because each question stands alone: the default memory
+ * stores every past question together with its retrieved segments, so a few turns fill
+ * the model's context window and the answer gets truncated to nothing.
  */
-@RegisterAiService(retrievalAugmentor = WardRetrievalAugmentor.class)
+@RegisterAiService(retrievalAugmentor = WardRetrievalAugmentor.class,
+        chatMemoryProviderSupplier = RegisterAiService.NoChatMemoryProviderSupplier.class)
 @ApplicationScoped
 public interface WardAiService {
 
