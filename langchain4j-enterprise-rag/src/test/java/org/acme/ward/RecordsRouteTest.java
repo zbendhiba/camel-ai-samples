@@ -43,8 +43,8 @@ public class RecordsRouteTest extends CamelQuarkusTestSupport {
         ingested.message(0).header(WardRoutes.DOCUMENT_ID_HEADER).startsWith("TEST-1@");
         ingested.message(0).body(String.class)
                 .contains("Patient Marie Dupont (id TEST-1, born 1956-03-12, sex Female).");
-        ingested.message(0).body(String.class).contains("Active conditions: none on record.");
-        ingested.message(0).body(String.class).contains("Allergies: none on record.");
+        ingested.message(0).body(String.class).contains("Marie Dupont has no active conditions on record.");
+        ingested.message(0).body(String.class).contains("Marie Dupont has no allergies on record.");
 
         template.sendBody("direct:records-initial-load", null);
         ingested.assertIsSatisfied(30000);

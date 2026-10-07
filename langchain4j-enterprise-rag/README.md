@@ -45,6 +45,57 @@ You can run your application in dev mode that enables live coding using:
 
 > **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
 
+## Running the demo
+
+Prerequisite: [Ollama](https://ollama.com/) running locally with the chat and
+embedding models pulled:
+
+```shell script
+ollama pull gemma4:e4b
+ollama pull embeddinggemma:300m
+```
+
+Start dev mode, open <http://localhost:8080>. Quarkus starts HAPI FHIR and Qdrant,
+seeds the 20 Synthea™ patients, and the record summaries land in the **Live** panel.
+Then send the three presets from the **Feed** box: an admission, an abnormal lab
+result and a normal one, timestamped in the recent past of your clock.
+
+### Questions about the records (available right after startup)
+
+| Question | Expected answer |
+|---|---|
+| Do we have any patients with heart failure? | Shalanda Gislason (chronic congestive heart failure) |
+| Any patients with chronic kidney disease? | Wilfredo Fritsch (CKD stages 1 to 3) |
+| Which patients are on clopidogrel or other antiplatelets? | Six patients take clopidogrel (Mauro Braun, Rosario Ortiz, Cristobal Montero, Rubin Lakin, Larissa Osinski, Ronny O'Hara), Rosario Ortiz also aspirin; expect four or five of them, see the note below |
+| Who had coronary bypass surgery? | Larissa Osinski, Ronny O'Hara, Mauro Braun, Rubin Lakin |
+| Which patients have epilepsy? | Cristobal Montero, Kera King |
+
+> **_NOTE:_** retrieval fetches the 16 closest facts, it is not a `SELECT *`. When
+> many patients share a treatment, the answer names the ones retrieval surfaced and
+> may miss a couple: grounded, correct, but not exhaustive. An exhaustive roster
+> ("all patients on clopidogrel") is a structured FHIR query, not a RAG question;
+> the same boundary as the single-patient lookup in SCENARIO.md.
+
+### Questions about the events (after sending the presets)
+
+| Question | Expected answer |
+|---|---|
+| What happened on the ward today? | The three injected events (the presets are timestamped in the recent past, so "this morning" only matches if you demo in the morning) |
+| Which patients had abnormal lab results? | Marie Dupont (glucose HIGH, potassium CRITICALLY HIGH) |
+| Which patient has critically high potassium? | Marie Dupont |
+| Why was Paul Martin admitted? | Chest pain, ward CARD1 |
+
+### Raw retrieval
+
+`GET /search?q=abnormal+glucose` shows the closest segments with score and source
+document id: the pipeline, before the model touches anything.
+
+> **_NOTE:_** until the Kafka idempotent repository arrives (phase 3), the
+> deduplication register is in-memory while Qdrant keeps its data across live
+> reloads: a code change in dev mode re-ingests the 20 records as duplicates.
+> After editing code, do a full restart (`q`, then `./mvnw quarkus:dev` again)
+> so the vector store starts clean.
+
 ## Packaging and running the application
 
 The application can be packaged using:

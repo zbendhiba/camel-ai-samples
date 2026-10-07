@@ -23,11 +23,13 @@ class RecordsFeedTest {
 
     @Test
     void seededRecordsBecomeSearchable() {
+        // Wilfredo's kidney disease is a seeded Synthea fact; finding it proves the
+        // whole chain: seeding, polling, rendering, embedding, storing
         Awaitility.await().atMost(Duration.ofMinutes(3)).untilAsserted(() -> given()
-                .queryParam("q", "active conditions and current medications of a patient")
+                .queryParam("q", "chronic kidney disease")
                 .get("/search")
                 .then()
                 .statusCode(200)
-                .body("text.flatten()", hasItem(containsString("Active conditions:"))));
+                .body("text.flatten()", hasItem(containsString("has Chronic kidney disease"))));
     }
 }

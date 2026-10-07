@@ -156,21 +156,31 @@ patient's record):
   "subject": { "reference": "Patient/PAT-123" } }
 ```
 
-Out: one record summary per patient, the same plain-language shape as the events.
+Out: one record summary per patient, written as one fact per sentence, every
+sentence naming the patient.
 
 ```
 Patient Marie Dupont (id PAT-123, born 1956-03-12, sex F).
-Active conditions: type 2 diabetes mellitus (2019), hypertension (2021).
-Current medications: metformin 500mg, lisinopril 10mg.
-Allergies: penicillin.
+Marie Dupont has Type 2 diabetes mellitus (since 2019).
+Marie Dupont has Essential hypertension (since 2021).
+Marie Dupont takes Metformin 500 MG.
+Marie Dupont is allergic to Penicillin.
 ```
 
 Same lesson on both routes: coded structure in (`44054006`, `860975`), words out
 ("type 2 diabetes", "metformin"). The display labels the standards carry are what
 makes the documents readable.
 
+The sentence form is not a style choice, it is retrieval engineering, and it was
+measured: in a comma-separated list of fifteen conditions, the ward's one
+congestive-heart-failure patient ranked 15th of 40 segments for "heart failure"
+(the single mention drowns in the embedding of the long list); as its own sentence
+the fact ranks first. And when the splitter cuts a long record into several
+segments, a fragment of an anonymous list loses its patient, while each of these
+sentences stays attributable on its own.
+
 What Qdrant stores per document: the text split into overlapping segments (800
-characters, 80 overlap), each with its 384-dimension MiniLM vector and this payload
+characters, 80 overlap), each with its 768-dimension embeddinggemma vector and this payload
 (a real one, straight from the Qdrant console):
 
 ```json
@@ -201,8 +211,12 @@ Deliberately standard. The point of the example is that the ingestion is where t
 work was.
 
 - Vector store: Qdrant, through `quarkus-langchain4j-qdrant` and its Dev Service.
-- Embeddings: in-process all-MiniLM-L6-v2 (384 dimensions), shared by ingestion
-  and retrieval. No API key.
+- Embeddings: embeddinggemma (768 dimensions) served by the same local Ollama as
+  the chat model, shared by ingestion and retrieval. No API key. It replaced the
+  in-process ONNX models (all-MiniLM-L6-v2, then bge-small-en-v1.5): measured on
+  this corpus, only embeddinggemma ranks the expected patient first on every demo
+  question; the small 384-dimension models drown a single mention ("chronic
+  congestive heart failure") in a long condition list.
 - Chat model: Ollama, as in the intro example.
 - The ward AI service: `@RegisterAiService` with a `RetrievalAugmentor` supporting a
   metadata filter (one patient, one ward). An AI service, not an agent: one grounded
