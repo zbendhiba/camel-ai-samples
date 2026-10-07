@@ -219,12 +219,13 @@ Deliberately standard. The point of the example is that the ingestion is where t
 work was.
 
 - Vector store: Qdrant, through `quarkus-langchain4j-qdrant` and its Dev Service.
-- Embeddings: embeddinggemma (768 dimensions) served by the same local Ollama as
-  the chat model, shared by ingestion and retrieval. No API key. It replaced the
-  in-process ONNX models (all-MiniLM-L6-v2, then bge-small-en-v1.5): measured on
-  this corpus, only embeddinggemma ranks the expected patient first on every demo
-  question; the small 384-dimension models drown a single mention ("chronic
-  congestive heart failure") in a long condition list.
+- Embeddings: embeddinggemma (768 dimensions), served by the same local Ollama as
+  the chat model, shared by ingestion and retrieval. No API key. The choice was
+  measured on this corpus, against the small in-process ONNX models
+  (all-MiniLM-L6-v2, bge-small-en-v1.5): embeddinggemma is the only one that
+  ranks the expected patient first on every demo question. At 384 dimensions, a
+  single mention ("chronic congestive heart failure") drowns in a long condition
+  list and the one patient who matters ranks mid-field.
 - Chat model: Ollama, as in the intro example.
 - The ward AI service: `@RegisterAiService` with a `RetrievalAugmentor` supporting a
   metadata filter (one patient, one ward). An AI service, not an agent: one grounded
