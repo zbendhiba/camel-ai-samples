@@ -177,15 +177,8 @@ Marie Dupont is allergic to Penicillin.
 
 Same lesson on both routes: coded structure in (`44054006`, `860975`), words out
 ("type 2 diabetes", "metformin"). The display labels the standards carry are what
-makes the documents readable.
-
-The sentence form is not a style choice, it is retrieval engineering, and it was
-measured: in a comma-separated list of fifteen conditions, the ward's one
-congestive-heart-failure patient ranked 15th of 40 segments for "heart failure"
-(the single mention drowns in the embedding of the long list); as its own sentence
-the fact ranks first. And when the splitter cuts a long record into several
-segments, a fragment of an anonymous list loses its patient, while each of these
-sentences stays attributable on its own.
+makes the documents readable. The sentence form is not a style choice, it is
+retrieval engineering: the next chapter shows the measurements behind it.
 
 What Qdrant stores per document: the text split into segments, each with its
 768-dimension embeddinggemma vector and this payload (a real one, straight from the
@@ -213,6 +206,95 @@ is the version-aware citation, `index` numbers the segments of a split document.
 - Every summary carries metadata: `patient`, `ward`, `event-type`. Retrieval filters
   on it, answers cite their source through `camel_ingest_document_id`.
 
+## Retrieval architecture: modeling the data for the questions
+
+The hardest part of this example is not wiring HL7 or FHIR. It is making a
+clinician's question reliably find the right facts in the vector store. Every
+choice in this chapter was measured, not guessed: a benchmark harness embeds the
+live corpus with each candidate, replays the demo questions, and ranks every
+segment. One failing question drove most of the design: *"Do we have any patients
+with heart failure?"*, with exactly one matching patient on the ward.
+
+### The shape of a document
+
+Events were never the problem. An event summary is short, focused, about one
+patient at one moment: it embeds well as it is.
+
+Records are the hard case. A patient record is long: fifteen conditions, ten
+medications. The obvious shape, a header followed by comma-separated lists, fails
+twice:
+
+- **Dilution.** An embedding of a long list is an average. The one patient whose
+  record literally says "Chronic congestive heart failure" ranked **15th of 40
+  segments** for "heart failure", behind patients with no heart condition at all:
+  one mention among fifteen weighs almost nothing in the vector.
+- **Attribution.** The splitter cuts long documents into segments, and a fragment
+  of an anonymous list ("Current medications: ...") loses its patient. The chat
+  model receives facts it cannot attribute, and says so.
+
+The shape that works is one fact per sentence, every sentence naming the patient
+("Shalanda Gislason has Chronic congestive heart failure (since 2024)."). Each
+sentence is one embeddable, citable, self-contained fact: the drowned fact ranks
+first, and any segment, however the splitter cuts, still says who it is about.
+
+### Segment sizes
+
+| Route | Segment | Overlap | Why |
+|---|---|---|---|
+| `ward` (events) | 800 chars | 80 | An event summary is one coherent clinical statement: keep it whole. The overlap guards the rare split. |
+| `records` | 200 chars | 0 | The sentence is the retrieval unit; 200 characters pack two or three facts. Sentences are independent, so an overlap would only duplicate them. |
+
+### The embedding model
+
+Three candidates, same corpus, same questions. The rank of the one
+congestive-heart-failure patient for "Do we have any patients with heart
+failure?" tells the story:
+
+| Document shape | Model | Rank of the right patient |
+|---|---|---|
+| Comma-separated lists | all-MiniLM-L6-v2 (in-process ONNX, 384 dim) | 15th of 40 |
+| Comma-separated lists | bge-small-en-v1.5 (in-process ONNX, 384 dim) | 14th |
+| Comma-separated lists | embeddinggemma (Ollama, 768 dim) | 3rd |
+| One fact per sentence | all-MiniLM-L6-v2 | **1st** |
+| One fact per sentence | embeddinggemma | **1st**, and first on every demo question |
+
+Two lessons.
+
+The **document shape matters more than the model**: a better model never rescued
+the diluted lists (bge-small beats MiniLM on every other question and still left
+the right patient 14th), while the sentence shape fixes the ranking even for the
+weakest model. Retrieval quality is decided where the documents are built: in the
+Camel route, not in the AI stack.
+
+The **model still decides the semantics**. The 384-dimension models behave close
+to a bag of words: "abnormal lab results" matched records containing the literal
+word "abnormal" (in "Abnormal findings diagnostic imaging") over a lab event
+flagged CRITICALLY HIGH. embeddinggemma matches meaning: "lab results" finds lab
+events, and a question about high potassium surfaces the kidney-disease record,
+a clinically sensible association no keyword overlap would make.
+
+embeddinggemma also fits the example's constraint. LangChain4j's in-process ONNX
+catalog stops at 384 dimensions, and Ollama is already in the stack for the chat
+model: everything stays local, no API key, one `ollama pull` away.
+
+### The retrieval window
+
+Retrieval hands the chat model the 16 closest segments, generous on purpose:
+"which patients" questions need several facts at once, and sixteen short
+sentences cost little. The chat model gets an 8192-token context window
+(`num-ctx`); Ollama's 4096 default did not fit a question, sixteen summaries and
+a thinking model's deliberation: the window filled, generation stopped mid-thought
+(`done_reason=length`) and answers came back empty.
+
+### Where retrieval stops
+
+Top-k retrieval is not `SELECT *`. When six patients share a treatment, the
+sixteen closest facts may carry four or five of them: the answer is grounded and
+correct, not exhaustive. An exhaustive roster, like a single-patient factual
+lookup, is a structured FHIR query: deterministic, no model in the path. Phase 3's
+metadata filtering narrows retrieval to one patient or one ward; it does not turn
+it into a database.
+
 ## RAG: plain Quarkus LangChain4j
 
 Deliberately standard. The point of the example is that the ingestion is where the
@@ -220,12 +302,8 @@ work was.
 
 - Vector store: Qdrant, through `quarkus-langchain4j-qdrant` and its Dev Service.
 - Embeddings: embeddinggemma (768 dimensions), served by the same local Ollama as
-  the chat model, shared by ingestion and retrieval. No API key. The choice was
-  measured on this corpus, against the small in-process ONNX models
-  (all-MiniLM-L6-v2, bge-small-en-v1.5): embeddinggemma is the only one that
-  ranks the expected patient first on every demo question. At 384 dimensions, a
-  single mention ("chronic congestive heart failure") drowns in a long condition
-  list and the one patient who matters ranks mid-field.
+  the chat model, shared by ingestion and retrieval. No API key. The choice is
+  measured, not preferred: see the retrieval architecture chapter above.
 - Chat model: `gemma4:e4b`, served by Ollama. In a hospital, patient data does not
   leave the premises: the model must run on local hardware, no API key, no cloud.
   Within that constraint, gemma4:e4b held the best accuracy-to-speed ratio of the
@@ -364,11 +442,9 @@ Questions about the records (available right after startup):
 | Who had coronary bypass surgery? | Larissa Osinski, Ronny O'Hara, Mauro Braun, Rubin Lakin |
 | Which patients have epilepsy? | Cristobal Montero, Kera King |
 
-> **_NOTE:_** retrieval fetches the 16 closest facts, it is not a `SELECT *`. When
-> many patients share a treatment, the answer names the ones retrieval surfaced and
-> may miss a couple: grounded, correct, but not exhaustive. An exhaustive roster
-> ("all patients on clopidogrel") is a structured FHIR query, not a RAG question;
-> the same boundary the RAG section above draws for the single-patient lookup.
+> **_NOTE:_** the clopidogrel answer may name four or five of the six: top-k
+> retrieval is not `SELECT *` (see "Where retrieval stops" in the architecture
+> chapter).
 
 Questions about the events (after sending the presets):
 
