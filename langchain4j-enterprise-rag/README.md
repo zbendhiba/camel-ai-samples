@@ -294,16 +294,15 @@ work was.
 
 - Vector store: Qdrant, through `quarkus-langchain4j-qdrant` and its Dev Service.
 - Embeddings: embeddinggemma (768 dimensions), served by the same local Ollama as
-  the chat model, shared by ingestion and retrieval. No API key. The choice is
-  measured, not preferred: see the retrieval architecture chapter above.
-- Chat model: `gemma4:e4b`, served by Ollama. In a hospital, patient data does not
-  leave the premises: the model must run on local hardware, no API key, no cloud.
-  Within that constraint, gemma4:e4b held the best accuracy-to-speed ratio of the
-  small local models tried (Granite, Qwen, Gemma, Phi families) and it holds up on
-  this example's hard parts: it refuses when the summaries do not contain the
-  answer, tells lab results apart from imaging findings, and uses the event
-  timestamps to answer "today" and "overnight" questions, at interactive latency
-  on a developer laptop. Swap it with `OLLAMA_MODEL`.
+  the chat model, shared by ingestion and retrieval. No API key. The why and the
+  numbers: see the retrieval architecture chapter.
+- Chat model: `gemma4:e4b`, served by Ollama. Patient data does not leave the
+  premises: the model runs on local hardware. No API key, no cloud. Within that
+  constraint, gemma4:e4b gave the best accuracy-to-speed ratio of the small local
+  models tried (Granite, Qwen, Gemma, Phi families). It holds up on the hard
+  parts: refuses when the summaries lack the answer, tells labs apart from
+  imaging findings, reads event timestamps for "today" and "overnight".
+  Interactive latency on a laptop. Swap it with `OLLAMA_MODEL`.
 - The ward AI service: `@RegisterAiService` with a `RetrievalAugmentor` supporting a
   metadata filter (one patient, one ward). An AI service, not an agent: one grounded
   question-answer flow, no tools, no multi-agent loop.
@@ -401,8 +400,8 @@ Two Compose Dev Services tricks worth noting:
   mode runs.
 
 WireMock appears **only** in the JVM and native tests, standing in for Ollama so CI
-runs without a GPU (the `OllamaTestResource` pattern from the intro example): chat
-answers are canned, and `/api/embed` returns deterministic bag-of-words vectors, so
+runs without a GPU (the `OllamaTestResource` pattern from the intro example). Chat
+answers are canned. `/api/embed` returns deterministic bag-of-words vectors:
 retrieval keeps real ranking semantics without any model. The MLLP feed is plain TCP
 and is fed directly from the tests; FHIR is the same Compose Dev Service there too.
 
@@ -430,7 +429,7 @@ Questions about the records (available right after startup):
 |---|---|
 | Do we have any patients with heart failure? | Shalanda Gislason (chronic congestive heart failure) |
 | Any patients with chronic kidney disease? | Wilfredo Fritsch (CKD stages 1 to 3) |
-| Which patients are on clopidogrel or other antiplatelets? | Six patients take clopidogrel (Mauro Braun, Rosario Ortiz, Cristobal Montero, Rubin Lakin, Larissa Osinski, Ronny O'Hara), Rosario Ortiz also aspirin; expect four or five of them, see the note below |
+| Which patients are on clopidogrel or other antiplatelets? | Six candidates: Mauro Braun, Rosario Ortiz (plus aspirin), Cristobal Montero, Rubin Lakin, Larissa Osinski, Ronny O'Hara. Expect four or five of them (see note) |
 | Who had coronary bypass surgery? | Larissa Osinski, Ronny O'Hara, Mauro Braun, Rubin Lakin |
 | Which patients have epilepsy? | Cristobal Montero, Kera King |
 
@@ -442,19 +441,20 @@ Questions about the events (after sending the presets):
 
 | Question | Expected answer |
 |---|---|
-| What happened on the ward today? | The three injected events (the presets are timestamped in the recent past, so "this morning" only matches if you demo in the morning) |
+| What happened on the ward today? | The three injected events |
 | Which patients had abnormal lab results? | Marie Dupont (glucose HIGH, potassium CRITICALLY HIGH) |
 | Which patient has critically high potassium? | Marie Dupont |
 | Why was Paul Martin admitted? | Chest pain, ward CARD1 |
 
-And the raw retrieval: `GET /search?q=abnormal+glucose` shows the closest segments
-with score and source document id: the pipeline, before the model touches anything.
+The presets are timestamped in the recent past of your clock. "This morning"
+only matches if you demo in the morning; "today" always does.
 
-> **_NOTE:_** until the Kafka idempotent repository arrives (phase 3), the
-> deduplication register is in-memory while Qdrant keeps its data across live
-> reloads: a code change in dev mode re-ingests the 20 records as duplicates.
-> After editing code, do a full restart (`q`, then `./mvnw quarkus:dev` again)
-> so the vector store starts clean.
+Raw retrieval: `GET /search?q=abnormal+glucose`. The closest segments, with
+score and source document id. The pipeline, before the model touches anything.
+
+> **_NOTE:_** the dedup register is in-memory until phase 3, and Qdrant survives
+> live reloads: a code change in dev mode re-ingests the 20 records as
+> duplicates. After editing code, restart fully (`q`, then `./mvnw quarkus:dev`).
 
 ## Endpoints
 
