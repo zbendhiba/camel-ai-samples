@@ -206,94 +206,86 @@ is the version-aware citation, `index` numbers the segments of a split document.
 - Every summary carries metadata: `patient`, `ward`, `event-type`. Retrieval filters
   on it, answers cite their source through `camel_ingest_document_id`.
 
-## Retrieval architecture: modeling the data for the questions
+## Retrieval architecture
 
-The hardest part of this example is not wiring HL7 or FHIR. It is making a
-clinician's question reliably find the right facts in the vector store. Every
-choice in this chapter was measured, not guessed: a benchmark harness embeds the
-live corpus with each candidate, replays the demo questions, and ranks every
-segment. One failing question drove most of the design: *"Do we have any patients
-with heart failure?"*, with exactly one matching patient on the ward.
+The hard part is not HL7 or FHIR. It is making a clinician's question find the
+right facts in the vector store.
 
-### The shape of a document
+The method: measure. A benchmark embeds the live corpus, replays the demo
+questions, ranks every segment. Each decision below comes with its numbers.
+The test question: "Do we have any patients with heart failure?". Exactly one
+matching patient on the ward.
 
-Events were never the problem. An event summary is short, focused, about one
-patient at one moment: it embeds well as it is.
+### Document shape
 
-Records are the hard case. A patient record is long: fifteen conditions, ten
-medications. The obvious shape, a header followed by comma-separated lists, fails
-twice:
+Events are short and focused. They embed well as they are.
 
-- **Dilution.** An embedding of a long list is an average. The one patient whose
-  record literally says "Chronic congestive heart failure" ranked **15th of 40
-  segments** for "heart failure", behind patients with no heart condition at all:
-  one mention among fifteen weighs almost nothing in the vector.
-- **Attribution.** The splitter cuts long documents into segments, and a fragment
-  of an anonymous list ("Current medications: ...") loses its patient. The chat
-  model receives facts it cannot attribute, and says so.
+Records are the problem. Fifteen conditions, ten medications per patient. The
+first shape was a header plus comma-separated lists. It fails twice:
 
-The shape that works is one fact per sentence, every sentence naming the patient
-("Shalanda Gislason has Chronic congestive heart failure (since 2024)."). Each
-sentence is one embeddable, citable, self-contained fact: the drowned fact ranks
-first, and any segment, however the splitter cuts, still says who it is about.
+| Failure | Cause | Measured |
+|---|---|---|
+| Dilution | An embedding of a long list is an average. One mention weighs nothing. | The only patient with "Chronic congestive heart failure" in her record ranks 15th of 40 for "heart failure" |
+| Attribution | The splitter cuts long documents. A list fragment carries no patient name. | The model receives "Current medications: ..." and cannot say whose |
+
+**Decision: one fact per sentence, each sentence names the patient.**
+
+```
+Shalanda Gislason has Chronic congestive heart failure (since 2024).
+```
+
+One sentence = one embeddable, citable, self-contained fact. The drowned fact
+ranks 1st. Any fragment still says who it is about.
 
 ### Segment sizes
 
 | Route | Segment | Overlap | Why |
 |---|---|---|---|
-| `ward` (events) | 800 chars | 80 | An event summary is one coherent clinical statement: keep it whole. The overlap guards the rare split. |
-| `records` | 200 chars | 0 | The sentence is the retrieval unit; 200 characters pack two or three facts. Sentences are independent, so an overlap would only duplicate them. |
+| `ward` | 800 | 80 | An event is one statement. Keep it whole. |
+| `records` | 200 | 0 | The sentence is the retrieval unit. Sentences are independent: an overlap would only duplicate them. |
 
-### The embedding model
+### Embedding model
 
-Three candidates, same corpus, same questions. The rank of the one
-congestive-heart-failure patient for "Do we have any patients with heart
-failure?" tells the story:
+Same corpus, same questions, three models. Rank of the right patient on the
+test question:
 
-| Document shape | Model | Rank of the right patient |
+| Document shape | Model | Rank |
 |---|---|---|
-| Comma-separated lists | all-MiniLM-L6-v2 (in-process ONNX, 384 dim) | 15th of 40 |
-| Comma-separated lists | bge-small-en-v1.5 (in-process ONNX, 384 dim) | 14th |
-| Comma-separated lists | embeddinggemma (Ollama, 768 dim) | 3rd |
-| One fact per sentence | all-MiniLM-L6-v2 | **1st** |
-| One fact per sentence | embeddinggemma | **1st**, and first on every demo question |
+| lists | all-MiniLM-L6-v2 (in-process ONNX, 384 dim) | 15th / 40 |
+| lists | bge-small-en-v1.5 (in-process ONNX, 384 dim) | 14th |
+| lists | embeddinggemma (Ollama, 768 dim) | 3rd |
+| sentences | all-MiniLM-L6-v2 | 1st |
+| sentences | embeddinggemma | 1st, and 1st on every demo question |
 
-Two lessons.
+What the table says:
 
-The **document shape matters more than the model**: a better model never rescued
-the diluted lists (bge-small beats MiniLM on every other question and still left
-the right patient 14th), while the sentence shape fixes the ranking even for the
-weakest model. Retrieval quality is decided where the documents are built: in the
-Camel route, not in the AI stack.
+- Document shape beats model. bge-small wins on every other question and still
+  leaves the right patient 14th. The sentence shape fixes the ranking even with
+  the weakest model. Retrieval quality is decided in the Camel route, not in
+  the AI stack.
+- The model decides semantics. At 384 dimensions the behavior is close to a bag
+  of words: "abnormal lab results" matched the literal word "abnormal" in
+  imaging findings, not the lab event flagged CRITICALLY HIGH. embeddinggemma
+  matches meaning: a potassium question also surfaces the kidney-disease record.
 
-The **model still decides the semantics**. The 384-dimension models behave close
-to a bag of words: "abnormal lab results" matched records containing the literal
-word "abnormal" (in "Abnormal findings diagnostic imaging") over a lab event
-flagged CRITICALLY HIGH. embeddinggemma matches meaning: "lab results" finds lab
-events, and a question about high potassium surfaces the kidney-disease record,
-a clinically sensible association no keyword overlap would make.
+**Decision: embeddinggemma.** Also because the in-process ONNX catalog stops at
+384 dimensions, and Ollama is already there for the chat model. Everything
+local, no API key, one `ollama pull`.
 
-embeddinggemma also fits the example's constraint. LangChain4j's in-process ONNX
-catalog stops at 384 dimensions, and Ollama is already in the stack for the chat
-model: everything stays local, no API key, one `ollama pull` away.
+### Retrieval window
 
-### The retrieval window
-
-Retrieval hands the chat model the 16 closest segments, generous on purpose:
-"which patients" questions need several facts at once, and sixteen short
-sentences cost little. The chat model gets an 8192-token context window
-(`num-ctx`); Ollama's 4096 default did not fit a question, sixteen summaries and
-a thinking model's deliberation: the window filled, generation stopped mid-thought
-(`done_reason=length`) and answers came back empty.
+16 segments per question. "Which patients" needs several facts, and sixteen
+short sentences are cheap. Chat context: `num-ctx=8192`. The Ollama default
+(4096) filled up: generation stopped mid-thinking (`done_reason=length`),
+answers came back empty.
 
 ### Where retrieval stops
 
-Top-k retrieval is not `SELECT *`. When six patients share a treatment, the
-sixteen closest facts may carry four or five of them: the answer is grounded and
-correct, not exhaustive. An exhaustive roster, like a single-patient factual
-lookup, is a structured FHIR query: deterministic, no model in the path. Phase 3's
-metadata filtering narrows retrieval to one patient or one ward; it does not turn
-it into a database.
+Top-k is not `SELECT *`. Six patients on clopidogrel, sixteen retrieved facts:
+the answer may name four or five. Grounded, correct, not exhaustive. An
+exhaustive roster is a FHIR query. Same for a single-patient lookup:
+deterministic, no model in the path. Phase 3 metadata filtering narrows
+retrieval to one patient or one ward. It does not turn it into a database.
 
 ## RAG: plain Quarkus LangChain4j
 
